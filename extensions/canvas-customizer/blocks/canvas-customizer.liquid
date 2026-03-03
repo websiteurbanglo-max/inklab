@@ -1,0 +1,82 @@
+{{ 'canvas-customizer.css' | asset_url | stylesheet_tag }}
+
+{%- liquid
+  assign app_url = block.settings.app_url
+  assign canvas_size = block.settings.canvas_size
+  assign show_fonts = block.settings.show_font_selector
+  assign show_upload = block.settings.show_image_upload
+  assign placeholder = block.settings.placeholder_text | default: 'Enter your text here...'
+-%}
+
+<div
+  id="inkcanvas-root-{{ block.id }}"
+  class="inkcanvas-root"
+  data-block-id="{{ block.id }}"
+  data-app-url="{{ app_url }}"
+  data-shop="{{ shop.myshopify_domain }}"
+  data-canvas-size="{{ canvas_size }}"
+  data-show-fonts="{{ show_fonts }}"
+  data-show-upload="{{ show_upload }}"
+  data-placeholder="{{ placeholder | escape }}"
+></div>
+
+<script>
+  (function () {
+    var el = document.getElementById('inkcanvas-root-{{ block.id }}');
+    if (!el) return;
+    window.InkCanvasConfig = {
+      rootId:     'inkcanvas-root-{{ block.id }}',
+      appUrl:     {{ app_url | json }},
+      shop:       {{ shop.myshopify_domain | json }},
+      canvasSize: {{ canvas_size }},
+      showFonts:  {{ show_fonts }},
+      showUpload: {{ show_upload }},
+      placeholder: {{ placeholder | json }},
+    };
+  })();
+</script>
+
+<script src="{{ 'canvas-customizer.js' | asset_url }}" defer></script>
+
+{% schema %}
+{
+  "name": "Canvas Customizer",
+  "target": "section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "app_url",
+      "label": "App URL",
+      "info": "The deployed URL of your InkCanvas backend (e.g. https://your-app.fly.dev)"
+    },
+    {
+      "type": "range",
+      "id": "canvas_size",
+      "min": 300,
+      "max": 800,
+      "step": 50,
+      "unit": "px",
+      "label": "Canvas size",
+      "default": 500
+    },
+    {
+      "type": "checkbox",
+      "id": "show_font_selector",
+      "label": "Show font selector",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_image_upload",
+      "label": "Allow image upload",
+      "default": true
+    },
+    {
+      "type": "text",
+      "id": "placeholder_text",
+      "label": "Text input placeholder",
+      "default": "Enter your text here..."
+    }
+  ],
+}
+{% endschema %}

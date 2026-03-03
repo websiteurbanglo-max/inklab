@@ -1,0 +1,155 @@
+/* ============================================================
+   InkCanvas Canvas Customizer – Storefront widget styles
+   ============================================================ */
+
+.inkcanvas-root {
+  container-type: inline-size;
+  font-family: inherit;
+}
+
+/* Layout: side-by-side on wide screens, stacked on narrow */
+.ikc-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+  margin: 24px 0;
+}
+
+/* Canvas column */
+.ikc-canvas-col {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: center;
+}
+
+.ikc-canvas-col canvas {
+  display: block;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  max-width: 100%;
+  height: auto;
+}
+
+/* Controls column */
+.ikc-controls-col {
+  flex: 1 1 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ikc-heading {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: inherit;
+}
+
+/* Form groups */
+.ikc-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ikc-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #374151;
+  letter-spacing: 0.01em;
+}
+
+/* Text input */
+.ikc-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: inherit;
+  background: #fff;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+
+.ikc-input:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Font selector */
+.ikc-select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  font-family: inherit;
+  color: inherit;
+  background: #fff;
+  cursor: pointer;
+  appearance: auto;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.ikc-select:focus {
+  outline: none;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
+/* Upload button */
+.ikc-upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border: 1px dashed #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  color: #374151;
+  background: #f9fafb;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.ikc-upload-btn:hover {
+  border-color: #6366f1;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.ikc-upload-btn svg {
+  flex-shrink: 0;
+}
+
+/* Helper note */
+.ikc-note {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+/* ── Responsive ── */
+@container (max-width: 600px) {
+  .ikc-wrap {
+    flex-direction: column;
+  }
+
+  .ikc-canvas-col {
+    width: 100%;
+  }
+
+  .ikc-canvas-col canvas {
+    width: 100% !important;
+    height: auto !important;
+  }
+}

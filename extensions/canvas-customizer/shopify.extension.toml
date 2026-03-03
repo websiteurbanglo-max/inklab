@@ -1,0 +1,41 @@
+name = "Canvas Customizer"
+handle = "canvas-customizer"
+
+uid = "b6b5c81b-231f-1134-5f7d-467860b4865b2ca75675"
+
+type = "theme"
+
+[settings]
+
+  [[settings.fields]]
+  key = "app_url"
+  type = "text"
+  label = "App URL (your deployed backend URL)"
+  default = ""
+
+  [[settings.fields]]
+  key = "canvas_size"
+  type = "range"
+  label = "Canvas size (px)"
+  min = 300
+  max = 800
+  step = 50
+  default = 500
+
+  [[settings.fields]]
+  key = "show_font_selector"
+  type = "checkbox"
+  label = "Show font selector"
+  default = true
+
+  [[settings.fields]]
+  key = "show_image_upload"
+  type = "checkbox"
+  label = "Allow customer image upload"
+  default = true
+
+  [[settings.fields]]
+  key = "placeholder_text"
+  type = "text"
+  label = "Text input placeholder"
+  default = "Enter your text here..."
