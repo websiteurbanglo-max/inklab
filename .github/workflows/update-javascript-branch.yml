@@ -95,15 +95,27 @@ jobs:
           git add .
           git checkout -b temp_javascript_updates
           git commit -m "Convert template to Javascript"
-          git checkout javascript || git checkout -b javascript
-          git pull origin javascript || echo "No remote javascript branch yet"
-          git checkout -
-          git rebase -m -X theirs javascript
+          if git ls-remote --exit-code --heads origin javascript; then
+            git checkout javascript
+            git pull origin javascript
+            git checkout -
+            git rebase -m -X theirs javascript
+          else
+            git checkout -
+          fi
           git push -f origin temp_javascript_updates:javascript_updates
+          git ls-remote --exit-code --heads origin javascript || git push origin temp_javascript_updates:javascript
 
       - name: Create Javascript PR
         run: |
-          gh pr view --json mergedAt -q ".mergedAt" javascript_updates | grep -E "^$" || \
-          gh pr create -B javascript -H javascript_updates --title 'Convert template to Javascript' --body 'This is an automated PR that converts the latest changes from Typescript to Javascript'
+          git fetch origin
+          COMMITS=$(git rev-list --count origin/javascript..origin/javascript_updates 2>/dev/null || echo "0")
+          if [ "$COMMITS" = "0" ]; then
+            echo "No new commits between javascript and javascript_updates, skipping PR"
+            exit 0
+          fi
+          gh pr view -H javascript_updates --json state -q ".state" 2>/dev/null | grep -qi "open" \
+            && echo "PR already open, skipping" \
+            || gh pr create -B javascript -H javascript_updates --title 'Convert template to Javascript' --body 'This is an automated PR that converts the latest changes from Typescript to Javascript'
         env:
           GH_TOKEN: ${{ github.token }}
