@@ -48,12 +48,25 @@
     var root = document.getElementById(ROOT_ID);
     if (!root) return;
     root.innerHTML = buildSkeletonHTML();
-    // Show loading state while Fabric CDN loads
     var canvas = root.querySelector('#ikc-canvas');
     if (canvas) canvas.style.background = '#f9fafb';
-    loadScript(FABRIC_CDN, function () { initWidget(root); }, function () {
-      showWidgetError(root, 'Canvas failed to load. Please refresh the page.');
-    });
+    // Fabric.js is loaded via asset_url in the Liquid template (served from Shopify CDN).
+    // If for any reason it's not yet defined, wait briefly and retry.
+    if (window.fabric) {
+      initWidget(root);
+    } else {
+      var attempts = 0;
+      var poll = setInterval(function () {
+        attempts++;
+        if (window.fabric) {
+          clearInterval(poll);
+          initWidget(root);
+        } else if (attempts > 50) {
+          clearInterval(poll);
+          showWidgetError(root, 'Canvas failed to load. Please refresh the page.');
+        }
+      }, 100);
+    }
   }
 
   function showWidgetError(root, msg) {
