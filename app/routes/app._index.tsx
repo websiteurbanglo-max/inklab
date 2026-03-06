@@ -4,6 +4,16 @@ import { authenticate } from "../shopify.server";
 import { getAllFonts } from "../models/font.server";
 import { getOrdersByShop } from "../models/order.server";
 import { upsertShop } from "../models/shop.server";
+import {
+  Page,
+  Card,
+  Banner,
+  BlockStack,
+  InlineStack,
+  Text,
+  Divider,
+  Box,
+} from "@shopify/polaris";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   console.log("[loader:app._index] START");
@@ -43,72 +53,69 @@ export default function AppHome() {
     useLoaderData<typeof loader>();
 
   return (
-    <s-page heading="InkCanvas Customizer">
-      {/* Welcome banner */}
-      <s-section padding="none">
-        <s-banner tone="info">
+    <Page title="InkCanvas Customizer">
+      <BlockStack gap="400">
+        <Banner tone="info">
           Welcome to <strong>InkCanvas</strong>! Use the navigation to manage
           fonts and view customized orders. The storefront canvas widget is
           injected via the Theme App Extension — activate it from your theme
           editor.
-        </s-banner>
-      </s-section>
+        </Banner>
 
-      {/* Stat cards */}
-      <s-section>
-        <s-stack direction="inline" gap="base">
-          <div style={{ flex: 1 }}>
-            <s-stack gap="small">
-              <s-heading>{fontCount}</s-heading>
-              <s-text tone="neutral">
-                Fonts uploaded ({activeFontCount} active)
-              </s-text>
+        <Card>
+          <InlineStack gap="800" align="start">
+            <BlockStack gap="200">
+              <Text variant="heading2xl" as="p">{fontCount}</Text>
+              <Text tone="subdued" as="p">
+                Fonts available ({activeFontCount} active)
+              </Text>
               <Link to="/app/fonts">Manage fonts →</Link>
-            </s-stack>
-          </div>
-          <s-divider />
-          <div style={{ flex: 1 }}>
-            <s-stack gap="small">
-              <s-heading>{recentOrderCount}</s-heading>
-              <s-text tone="neutral">Recent customized orders</s-text>
+            </BlockStack>
+            <Divider />
+            <BlockStack gap="200">
+              <Text variant="heading2xl" as="p">{recentOrderCount}</Text>
+              <Text tone="subdued" as="p">Recent customized orders</Text>
               <Link to="/app/orders">View all orders →</Link>
-            </s-stack>
-          </div>
-        </s-stack>
-      </s-section>
+            </BlockStack>
+          </InlineStack>
+        </Card>
 
-      {/* Quick setup guide */}
-      <s-section heading="Quick setup guide">
-        <s-stack gap="base">
-          <s-paragraph>
-            <strong>Step 1 — Upload fonts</strong>
-            <br />
-            Go to Fonts and upload any custom TTF, OTF, WOFF, or WOFF2 fonts
-            you want customers to use.
-          </s-paragraph>
-          <s-paragraph>
-            <strong>Step 2 — Activate the canvas widget</strong>
-            <br />
-            In your Shopify admin, navigate to Online Store → Themes →
-            Customize. Add the Canvas Customizer app block to the product page
-            section.
-          </s-paragraph>
-          <s-paragraph>
-            <strong>Step 3 — Receive orders</strong>
-            <br />
-            When customers personalize and purchase a product, the
-            customization data will appear in the Orders tab with download
-            links for the raw image and design PNG.
-          </s-paragraph>
-        </s-stack>
-      </s-section>
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingMd" as="h2">Quick setup guide</Text>
+            <BlockStack gap="200">
+              <Text as="p">
+                <strong>Step 1 — Upload fonts</strong>
+                <br />
+                Go to Fonts and upload any custom TTF, OTF, WOFF, or WOFF2
+                fonts you want customers to use. 20 built-in Google Fonts are
+                included by default.
+              </Text>
+              <Text as="p">
+                <strong>Step 2 — Activate the canvas widget</strong>
+                <br />
+                In your Shopify admin, navigate to Online Store → Themes →
+                Customize. Add the{" "}
+                <strong>Canvas Customizer</strong> app block to the product
+                page section.
+              </Text>
+              <Text as="p">
+                <strong>Step 3 — Receive orders</strong>
+                <br />
+                When customers personalize and purchase a product, the
+                customization data will appear in the Orders tab with download
+                links for the raw image and print-ready design PNG.
+              </Text>
+            </BlockStack>
+          </BlockStack>
+        </Card>
 
-      {/* Connected shop */}
-      <s-section padding="none">
-        <s-text tone="neutral">
-          Connected shop: <strong>{shop}</strong>
-        </s-text>
-      </s-section>
-    </s-page>
+        <Box paddingBlockStart="100">
+          <Text tone="subdued" as="p">
+            Connected shop: <strong>{shop}</strong>
+          </Text>
+        </Box>
+      </BlockStack>
+    </Page>
   );
 }
