@@ -167,8 +167,8 @@
       hintObj:      null,  // faint placeholder removed once content is added
     };
 
-    // Show a faint hint so the user can see the canvas is ready
-    state.hintObj = new fabric.IText('Add text or image to preview', {
+    // Faint hint text — uses fabric.Text which is confirmed available in v6
+    state.hintObj = new fabric.Text('Add text or image to preview', {
       left:       CANVAS_SZ / 2,
       top:        CANVAS_SZ / 2,
       originX:    'center',
@@ -268,7 +268,7 @@
       if (!state.textObj) {
         if (!val) return;
         if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
-        state.textObj = new state.FabricText(val, {
+        state.textObj = new fabric.Text(val, {
           left:       CANVAS_SZ / 2,
           top:        Math.round(CANVAS_SZ * 0.78),
           originX:    'center',
@@ -277,7 +277,6 @@
           fontFamily: state.fontFamily,
           fill:       state.textColor,
           textAlign:  'center',
-          editable:   true,
         });
         fc.add(state.textObj);
         fc.setActiveObject(state.textObj);
