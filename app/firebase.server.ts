@@ -72,10 +72,12 @@ export async function uploadToStorage(
 
   await file.save(buffer, {
     metadata: { contentType },
-    // Make the file publicly readable
+    // Make the file publicly readable via object ACL (fine-grained access buckets)
     predefinedAcl: "publicRead",
   });
 
-  // Return the public URL
-  return `https://storage.googleapis.com/${bucket.name}/${destination}`;
+  // Firebase Storage REST URL — includes proper CORS headers and works cross-origin
+  // Format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?alt=media
+  const encodedPath = encodeURIComponent(destination);
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media`;
 }
