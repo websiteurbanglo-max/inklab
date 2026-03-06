@@ -1,4 +1,5 @@
 import admin from "firebase-admin";
+import { v4 as uuidv4 } from "uuid";
 import type { Firestore } from "firebase-admin/firestore";
 import type { Storage } from "firebase-admin/storage";
 
@@ -70,14 +71,21 @@ export async function uploadToStorage(
   const bucket = getStorage().bucket();
   const file = bucket.file(destination);
 
+  // Generate a download token — this is the same mechanism used by the Firebase Console.
+  // It embeds into the URL and bypasses Firebase Security Rules, so storefront visitors
+  // (unauthenticated) can load the image directly in the browser / on the canvas.
+  const downloadToken = uuidv4();
+
   await file.save(buffer, {
-    metadata: { contentType },
-    // Make the file publicly readable via object ACL (fine-grained access buckets)
-    predefinedAcl: "publicRead",
+    metadata: {
+      contentType,
+      metadata: {
+        firebaseStorageDownloadTokens: downloadToken,
+      },
+    },
   });
 
-  // Firebase Storage REST URL — includes proper CORS headers and works cross-origin
-  // Format: https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{encodedPath}?alt=media
+  // Firebase Storage download URL with token — works cross-origin, no auth required
   const encodedPath = encodeURIComponent(destination);
-  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media`;
+  return `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodedPath}?alt=media&token=${downloadToken}`;
 }
