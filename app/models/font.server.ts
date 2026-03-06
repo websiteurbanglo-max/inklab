@@ -49,12 +49,22 @@ const fontsCollection = (shopDomain: string) =>
 
 export async function getFonts(shopDomain: string): Promise<Font[]> {
   console.log(`[font] getFonts (active only) shopDomain=${shopDomain}`);
-  const snapshot = await fontsCollection(shopDomain)
-    .where("isActive", "==", true)
-    .orderBy("createdAt", "desc")
-    .get();
-  const shopFonts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Font));
-  console.log(`[font] getFonts returned ${shopFonts.length} shop fonts + ${SYSTEM_FONTS.length} system fonts`);
+  let shopFonts: Font[] = [];
+  try {
+    const snapshot = await fontsCollection(shopDomain)
+      .where("isActive", "==", true)
+      .orderBy("createdAt", "desc")
+      .get();
+    shopFonts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Font));
+    console.log(`[font] getFonts returned ${shopFonts.length} shop fonts + ${SYSTEM_FONTS.length} system fonts`);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    // Log full error but don't crash — SYSTEM_FONTS are always served
+    console.error(`[font] Firestore query failed (missing composite index?): ${msg}`);
+    if (msg.includes("index") || msg.includes("failed-precondition")) {
+      console.error("[font] Deploy the Firestore index: npx firebase-tools deploy --only firestore:indexes");
+    }
+  }
   // System fonts appear first so customers always have options even before the merchant uploads anything
   return [...SYSTEM_FONTS, ...shopFonts];
 }
