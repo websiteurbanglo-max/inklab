@@ -46,11 +46,14 @@
     var root = document.getElementById(ROOT_ID);
     if (!root) return;
 
-    // Responsive: shrink canvas to fit narrow screens before Fabric initialises.
-    // Fabric sets inline pixel dimensions on its wrapper div, so CSS alone can't rescue it.
-    var vw = window.innerWidth || document.documentElement.clientWidth || 600;
-    if (vw < 640) {
-      CANVAS_SZ = Math.max(Math.min(CANVAS_SZ, vw - 40), 220);
+    // Measure the actual rendered container width BEFORE populating innerHTML.
+    // This is far more accurate than window.innerWidth which ignores theme margins.
+    var rect = root.getBoundingClientRect();
+    var containerWidth = rect.width || root.clientWidth || window.innerWidth || 600;
+    // Subtract our 20px padding on each side (40px total).
+    var innerWidth = Math.round(containerWidth - 40);
+    if (innerWidth > 0 && innerWidth < CANVAS_SZ) {
+      CANVAS_SZ = Math.max(innerWidth, 220);
     }
 
     root.innerHTML = buildSkeletonHTML();
@@ -149,12 +152,18 @@
     canvasEl.width  = CANVAS_SZ;
     canvasEl.height = CANVAS_SZ;
 
-    var fc = new fabric.Canvas('ikc-canvas', {
+    var fc = new fabric.Canvas(canvasEl, {
       backgroundColor: '#f8f9fa',
       preserveObjectStacking: true,
       width: CANVAS_SZ,
       height: CANVAS_SZ,
     });
+
+    // Ensure the wrapper div Fabric inserts always shows at the correct size.
+    if (fc.wrapperEl) {
+      fc.wrapperEl.style.width  = CANVAS_SZ + 'px';
+      fc.wrapperEl.style.height = CANVAS_SZ + 'px';
+    }
 
     var state = {
       textObj:      null,

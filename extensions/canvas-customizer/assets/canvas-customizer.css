@@ -3,7 +3,6 @@
    ============================================================ */
 
 .inkcanvas-root {
-  container-type: inline-size;
   font-family: inherit;
   border: 1px solid #e5e7eb;
   border-radius: 12px;
@@ -14,18 +13,17 @@
   box-sizing: border-box;
 }
 
-/* Layout: side-by-side on wide screens, stacked on narrow */
+/* Layout: always stacked — canvas on top, controls below */
 .ikc-wrap {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 24px;
-  align-items: flex-start;
-  margin: 24px 0;
+  margin: 0;
 }
 
-/* Canvas column */
+/* Canvas column — full width, canvas centred inside */
 .ikc-canvas-col {
-  flex: 0 0 auto;
+  width: 100%;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -44,7 +42,7 @@
 
 /* Controls column */
 .ikc-controls-col {
-  flex: 1 1 240px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -189,26 +187,9 @@
 }
 
 /* ── Responsive ── */
-/* JS in boot() clamps CANVAS_SZ to viewport width on narrow screens before Fabric init. */
-@container (max-width: 620px) {
-  .ikc-wrap {
-    flex-direction: column;
-  }
-
-  .ikc-canvas-col {
-    width: 100%;
-    justify-content: center;
-  }
-}
-
-/* Hard fallback for themes where container queries don't fire */
+/* Canvas sizing is handled in JS boot() using the container's measured width. */
 @media (max-width: 640px) {
-  .ikc-wrap {
-    flex-direction: column !important;
-  }
-
-  .ikc-canvas-col {
-    width: 100% !important;
-    justify-content: center !important;
+  .inkcanvas-root {
+    padding: 12px;
   }
 }
