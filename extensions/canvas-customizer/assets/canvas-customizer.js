@@ -154,7 +154,8 @@
       fontFamily:   'sans-serif',
       fontName:     '',
       textColor:    '#1a1a1a',
-      rawImageUrl:  '',
+      rawFile:      null,   // File object — set on file select, uploaded only at cart submit
+      blobUrl:      '',    // revocable blob URL for canvas preview (no server needed)
     };
 
     if (SHOW_FONTS)  setupFonts(fc, state);
@@ -280,6 +281,8 @@
   }
 
   // ── Image upload ────────────────────────────────────────────────────────
+  // The image is previewed on canvas instantly using a local blob URL.
+  // The actual upload to Firebase only happens at cart submit time.
   function setupImageUpload(fc, state, root) {
     var input     = document.getElementById('ikc-img-input');
     var labelSpan = document.getElementById('ikc-upload-label');
@@ -296,28 +299,16 @@
       }
 
       clearWidgetError(root);
-      if (labelSpan) labelSpan.textContent = 'Uploading…';
 
-      var fd = new FormData();
-      fd.append('file', file);
+      // Revoke previous blob URL to free memory
+      if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
 
-      fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
-        method: 'POST',
-        body: fd,
-      })
-        .then(function (r) {
-          if (!r.ok) throw new Error('Server error: ' + r.status);
-          return r.json();
-        })
-        .then(function (data) {
-          state.rawImageUrl = data.url || '';
-          placeImageOnCanvas(fc, state, data.url, file.name, labelSpan, root);
-        })
-        .catch(function (err) {
-          console.error('[InkCanvas] Raw image upload failed:', err);
-          if (labelSpan) labelSpan.textContent = 'Upload failed – try again';
-          showWidgetError(root, 'Image upload failed. Please try again.');
-        });
+      // Create a local blob URL — no server call needed for preview
+      var blobUrl = URL.createObjectURL(file);
+      state.rawFile = file;
+      state.blobUrl = blobUrl;
+
+      placeImageOnCanvas(fc, state, blobUrl, file.name, labelSpan, root);
     });
   }
 
@@ -354,6 +345,10 @@
   }
 
   // ── Add to Cart intercept ───────────────────────────────────────────────
+  // At submit time we upload two things to Firebase in parallel:
+  //   1. The raw customer image file (for merchant reference)
+  //   2. The canvas export PNG (the actual print-ready design)
+  // During the live preview phase, no server calls are made.
   function setupCartInterception(fc, state, root) {
     // Find the product form — works with most Shopify themes
     var form = findProductForm(root);
@@ -365,7 +360,7 @@
     form.addEventListener('submit', function (e) {
       var textInput = document.getElementById('ikc-text-input');
       var hasText   = textInput && textInput.value.trim().length > 0;
-      var hasImage  = Boolean(state.rawImageUrl);
+      var hasImage  = Boolean(state.rawFile);
 
       // If nothing was customized, let normal cart submission proceed
       if (!hasText && !hasImage) return;
@@ -379,30 +374,51 @@
       // Export canvas at 3× DPI for print quality (1500×1500 for a 500px canvas)
       var dataUrl = fc.toDataURL({ format: 'png', multiplier: 3 });
 
-      fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
+      // Upload canvas design PNG
+      var designUpload = fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataUrl: dataUrl }),
-      })
-        .then(function (r) {
-          if (!r.ok) throw new Error('Server error: ' + r.status);
-          return r.json();
-        })
-        .then(function (data) {
-          // Note: _canvas_json omitted — exceeds Shopify's 255-char line item property limit.
-          // The design PNG URL is sufficient for production use.
+      }).then(function (r) {
+        if (!r.ok) throw new Error('Design upload error: ' + r.status);
+        return r.json();
+      });
+
+      // Upload raw customer image file (only if they uploaded one)
+      var rawUpload = state.rawFile
+        ? (function () {
+            var fd = new FormData();
+            fd.append('file', state.rawFile);
+            return fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
+              method: 'POST',
+              body: fd,
+            }).then(function (r) {
+              if (!r.ok) throw new Error('Raw upload error: ' + r.status);
+              return r.json();
+            });
+          })()
+        : Promise.resolve({ url: '' });
+
+      Promise.all([designUpload, rawUpload])
+        .then(function (results) {
+          var designData = results[0];
+          var rawData    = results[1];
+
+          // Revoke blob URL — we now have permanent Firebase URLs
+          if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
+
           var props = {
             '_custom_text':       (textInput && textInput.value.trim()) || '',
             '_custom_font':       state.fontName || '',
-            '_raw_image_url':     state.rawImageUrl || '',
-            '_design_image_url':  data.url || '',
+            '_raw_image_url':     rawData.url || '',
+            '_design_image_url':  designData.url || '',
           };
 
           injectLineItemProps(form, props);
           form.submit();
         })
         .catch(function (err) {
-          console.error('[InkCanvas] Design upload failed:', err);
+          console.error('[InkCanvas] Cart upload failed:', err);
           if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origLabel || 'Add to cart'; }
           showWidgetError(root, 'Failed to save your design. Please try again.');
         });
