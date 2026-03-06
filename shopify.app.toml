@@ -4,7 +4,7 @@ client_id = "d4a2e70354f0e03941c0060943bc564e"
 name = "inklabs"
 # ⚠️  This placeholder is automatically overridden by `shopify app dev` (automatically_update_urls_on_dev = true).
 #   For production, replace with your actual deployed URL before running `shopify app deploy`.
-application_url = "https://example.com"
+application_url = "https://inklab-production.up.railway.app"
 embedded = true
 
 [webhooks]
@@ -29,7 +29,10 @@ optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ ]
+redirect_urls = [
+  "https://inklab-production.up.railway.app/auth/callback",
+  "https://inklab-production.up.railway.app/auth/shopify/callback"
+ ]
 
 [build]
 automatically_update_urls_on_dev = true

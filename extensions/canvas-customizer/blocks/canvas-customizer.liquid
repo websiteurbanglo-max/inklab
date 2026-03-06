@@ -11,6 +11,7 @@
 <div
   id="inkcanvas-root-{{ block.id }}"
   class="inkcanvas-root"
+  {{ block.shopify_attributes }}
   data-block-id="{{ block.id }}"
   data-app-url="{{ app_url }}"
   data-shop="{{ shop.myshopify_domain }}"
@@ -27,7 +28,7 @@
     window.InkCanvasConfig = {
       rootId:     'inkcanvas-root-{{ block.id }}',
       appUrl:     {{ app_url | json }},
-      shop:       {{ shop.myshopify_domain | json }},
+      shop:       {{ shop.myshopify_domain | json }} || (window.Shopify && window.Shopify.shop) || '',
       canvasSize: {{ canvas_size }},
       showFonts:  {{ show_fonts }},
       showUpload: {{ show_upload }},
@@ -77,6 +78,6 @@
       "label": "Text input placeholder",
       "default": "Enter your text here..."
     }
-  ],
+  ]
 }
 {% endschema %}

@@ -8,10 +8,29 @@
   'use strict';
 
   // ── Read config written by the Liquid block ─────────────────────────────
-  var cfg       = window.InkCanvasConfig || {};
+  // Primary source: window.InkCanvasConfig (set by the Liquid block).
+  // Fallback: read from the root .inkcanvas-root element's data-* attributes.
+  var cfg = window.InkCanvasConfig || {};
+
+  if (!cfg.appUrl || !cfg.shop || !cfg.rootId) {
+    var rootEl = document.querySelector('.inkcanvas-root[data-app-url][data-shop]');
+    if (rootEl) {
+      cfg = {
+        rootId: rootEl.id || 'inkcanvas-root',
+        appUrl: rootEl.getAttribute('data-app-url') || '',
+        shop: rootEl.getAttribute('data-shop') || '',
+        canvasSize: rootEl.getAttribute('data-canvas-size') || 500,
+        showFonts: rootEl.getAttribute('data-show-fonts'),
+        showUpload: rootEl.getAttribute('data-show-upload'),
+        placeholder: rootEl.getAttribute('data-placeholder') || 'Enter your text here...',
+      };
+      window.InkCanvasConfig = cfg;
+    }
+  }
+
   var ROOT_ID   = cfg.rootId   || 'inkcanvas-root';
   var APP_URL   = (cfg.appUrl  || '').replace(/\/$/, '');
-  var SHOP      = cfg.shop     || '';
+  var SHOP      = cfg.shop     || (window.Shopify && window.Shopify.shop) || '';
   var CANVAS_SZ = parseInt(cfg.canvasSize, 10) || 500;
   var SHOW_FONTS  = cfg.showFonts  !== false && cfg.showFonts  !== 'false';
   var SHOW_UPLOAD = cfg.showUpload !== false && cfg.showUpload !== 'false';
