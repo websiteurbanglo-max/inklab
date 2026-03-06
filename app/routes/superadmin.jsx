@@ -1,46 +1,51 @@
 import { useState } from "react";
-import type { LoaderFunctionArgs, ActionFunctionArgs } from "react-router";
 import { useLoaderData, useActionData, Form, redirect } from "react-router";
 import { searchOrders } from "../models/order.server";
 import { getAllShops } from "../models/shop.server";
-
 // ---------- Auth helpers ----------
 const SESSION_COOKIE = "sa_token";
 const TOKEN_TTL_MS = 8 * 60 * 60 * 1000; // 8 hours
 
-function buildCookie(token: string, maxAge: number) {
+function buildCookie(token, maxAge) {
   return `${SESSION_COOKIE}=${token}; Path=/superadmin; HttpOnly; SameSite=Lax; Max-Age=${maxAge}`;
 }
 
-function getTokenFromRequest(request: Request): string | null {
+function getTokenFromRequest(request) {
   const cookie = request.headers.get("cookie") ?? "";
   const match = cookie.match(new RegExp(`${SESSION_COOKIE}=([^;]+)`));
+
   return match?.[1] ?? null;
 }
 
-function isValidToken(token: string | null): boolean {
+function isValidToken(token) {
   if (!token) return false;
   const secret = process.env.SUPERADMIN_SECRET;
+
   if (!secret) return false;
+
   // Token format: base64(secret:timestamp)
   try {
     const decoded = Buffer.from(token, "base64").toString("utf-8");
     const [s, ts] = decoded.split(":");
+
     if (s !== secret) return false;
+
     return Date.now() - Number(ts) < TOKEN_TTL_MS;
   } catch {
     return false;
   }
 }
 
-function createToken(): string {
+function createToken() {
   const secret = process.env.SUPERADMIN_SECRET ?? "";
+
   return Buffer.from(`${secret}:${Date.now()}`).toString("base64");
 }
 
 // ---------- Loader ----------
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }) => {
   const token = getTokenFromRequest(request);
+
   if (!isValidToken(token)) {
     return { authed: false, orders: [], shops: [], stats: null };
   }
@@ -48,9 +53,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const shopFilter = url.searchParams.get("shop") ?? "";
   const searchTerm = url.searchParams.get("q") ?? "";
-
   const [orders, shops] = await Promise.all([
-    searchOrders({ shopDomain: shopFilter || undefined, search: searchTerm || undefined, limit: 200 }),
+    searchOrders({
+      shopDomain: shopFilter || undefined,
+      search: searchTerm || undefined,
+      limit: 200,
+    }),
     getAllShops(),
   ]);
 
@@ -69,18 +77,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 // ---------- Action (login / logout) ----------
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }) => {
   const formData = await request.formData();
   const intent = formData.get("intent");
 
   if (intent === "login") {
-    const password = formData.get("password") as string;
+    const password = formData.get("password");
+
     if (password === process.env.SUPERADMIN_SECRET) {
       const token = createToken();
+
       return redirect("/superadmin", {
         headers: { "Set-Cookie": buildCookie(token, 60 * 60 * 8) },
       });
     }
+
     return { loginError: "Invalid password." };
   }
 
@@ -94,9 +105,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 // ---------- Utility ----------
-function fmtDate(ts: unknown): string {
+function fmtDate(ts) {
   if (!ts || typeof ts !== "object") return "—";
-  const s = (ts as { _seconds: number })._seconds;
+  const s = ts._seconds;
+
   return new Date(s * 1000).toLocaleString("en-US", {
     year: "numeric",
     month: "short",
@@ -108,8 +120,8 @@ function fmtDate(ts: unknown): string {
 
 // ---------- Component ----------
 export default function Superadmin() {
-  const data = useLoaderData<typeof loader>();
-  const actionData = useActionData<typeof action>();
+  const data = useLoaderData();
+  const actionData = useActionData();
   const [pwVisible, setPwVisible] = useState(false);
 
   // ---- Login screen ----
@@ -165,13 +177,7 @@ export default function Superadmin() {
   }
 
   // ---- Dashboard ----
-  const { orders, shops, stats, shopFilter, searchTerm } = data as {
-    orders: Awaited<ReturnType<typeof searchOrders>>;
-    shops: Awaited<ReturnType<typeof getAllShops>>;
-    stats: { totalOrders: number; totalShops: number; activeShops: number };
-    shopFilter: string;
-    searchTerm: string;
-  };
+  const { orders, shops, stats, shopFilter, searchTerm } = data;
 
   return (
     <html lang="en">
@@ -186,7 +192,9 @@ export default function Superadmin() {
           <span className="logo">⬛ InkCanvas Superadmin</span>
           <Form method="post" style={{ display: "inline" }}>
             <input type="hidden" name="intent" value="logout" />
-            <button type="submit" className="btn-logout">Sign out</button>
+            <button type="submit" className="btn-logout">
+              Sign out
+            </button>
           </Form>
         </header>
 
@@ -223,8 +231,12 @@ export default function Superadmin() {
               type="search"
               placeholder="Search customer / order #"
             />
-            <button type="submit" className="btn-primary">Filter</button>
-            <a href="/superadmin" className="btn-reset">Reset</a>
+            <button type="submit" className="btn-primary">
+              Filter
+            </button>
+            <a href="/superadmin" className="btn-reset">
+              Reset
+            </a>
           </Form>
         </section>
 
@@ -265,11 +277,17 @@ export default function Superadmin() {
                       </td>
                       <td>
                         {c.customText && <div>📝 {c.customText}</div>}
-                        {c.fontName && <div className="sub-text">🔡 {c.fontName}</div>}
+                        {c.fontName && (
+                          <div className="sub-text">🔡 {c.fontName}</div>
+                        )}
                       </td>
                       <td>
                         {c.designImageUrl ? (
-                          <a href={c.designImageUrl} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={c.designImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <img
                               src={c.designImageUrl}
                               alt="Canvas design"
@@ -282,18 +300,28 @@ export default function Superadmin() {
                       </td>
                       <td className="dl-cell">
                         {c.rawImageUrl && (
-                          <a href={c.rawImageUrl} target="_blank" rel="noopener noreferrer" className="dl-btn">
+                          <a
+                            href={c.rawImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="dl-btn"
+                          >
                             Raw
                           </a>
                         )}
                         {c.designImageUrl && (
-                          <a href={c.designImageUrl} target="_blank" rel="noopener noreferrer" className="dl-btn dl-btn--primary">
+                          <a
+                            href={c.designImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="dl-btn dl-btn--primary"
+                          >
                             Design
                           </a>
                         )}
                       </td>
                     </tr>
-                  ))
+                  )),
                 )}
               </tbody>
             </table>
@@ -321,7 +349,6 @@ const loginStyles = `
   .btn-primary { width: 100%; padding: 12px; background: #111827; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
   .btn-primary:hover { background: #1f2937; }
 `;
-
 const dashboardStyles = `
   *, *::before, *::after { box-sizing: border-box; }
   body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f4f6f8; color: #111827; }

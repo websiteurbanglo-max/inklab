@@ -1,28 +1,30 @@
 import { useLoaderData } from "react-router";
-import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getOrdersByShop } from "../models/order.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }) => {
   console.log("[loader:app.orders] START");
+
   try {
     const { session } = await authenticate.admin(request);
-    console.log("[loader:app.orders] Authenticated shop:", session.shop);
 
+    console.log("[loader:app.orders] Authenticated shop:", session.shop);
     console.log("[loader:app.orders] Fetching orders from Firestore");
     const orders = await getOrdersByShop(session.shop, 100);
+
     console.log(`[loader:app.orders] Fetched ${orders.length} orders`);
 
     return { orders };
-  } catch (err: unknown) {
+  } catch (err) {
     if (err instanceof Response) throw err;
     console.error("[loader:app.orders] FAILED:", err);
     throw err;
   }
 };
 
-function formatDate(ts: { _seconds: number } | null | undefined): string {
+function formatDate(ts) {
   if (!ts) return "—";
+
   return new Date(ts._seconds * 1000).toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
@@ -31,7 +33,7 @@ function formatDate(ts: { _seconds: number } | null | undefined): string {
 }
 
 export default function OrdersPage() {
-  const { orders } = useLoaderData<typeof loader>();
+  const { orders } = useLoaderData();
 
   return (
     <s-page heading="Customized Orders">
@@ -48,20 +50,37 @@ export default function OrdersPage() {
       {/* Orders table */}
       <s-section>
         {orders.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "2rem 0" }}><s-stack gap="base">
-            <s-heading>No customized orders yet</s-heading>
-            <s-paragraph tone="neutral">
-              Customized orders will appear here once customers start
-              personalizing products using the canvas widget.
-            </s-paragraph>
-          </s-stack></div>
+          <div style={{ textAlign: "center", padding: "2rem 0" }}>
+            <s-stack gap="base">
+              <s-heading>No customized orders yet</s-heading>
+              <s-paragraph tone="neutral">
+                Customized orders will appear here once customers start
+                personalizing products using the canvas widget.
+              </s-paragraph>
+            </s-stack>
+          </div>
         ) : (
           <s-table>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr>
-                  {["Order", "Date", "Customer", "Product", "Customization", "Preview", "Downloads"].map((h) => (
-                    <th key={h} style={{ textAlign: "left", padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
+                  {[
+                    "Order",
+                    "Date",
+                    "Customer",
+                    "Product",
+                    "Customization",
+                    "Preview",
+                    "Downloads",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        textAlign: "left",
+                        padding: "0.5rem 1rem",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
                       {h}
                     </th>
                   ))}
@@ -72,12 +91,18 @@ export default function OrdersPage() {
                   order.customizations.map((c, ci) => (
                     <tr key={`${order.id}-${ci}`}>
                       {/* Order number */}
-                      <td style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
-                        <s-text font-weight="semibold">#{order.shopifyOrderNumber}</s-text>
+                      <td
+                        style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}
+                      >
+                        <s-text font-weight="semibold">
+                          #{order.shopifyOrderNumber}
+                        </s-text>
                       </td>
                       {/* Date */}
-                      <td style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}>
-                        {formatDate(order.createdAt as unknown as { _seconds: number })}
+                      <td
+                        style={{ padding: "0.5rem 1rem", whiteSpace: "nowrap" }}
+                      >
+                        {formatDate(order.createdAt)}
                       </td>
                       {/* Customer */}
                       <td style={{ padding: "0.5rem 1rem" }}>
@@ -99,17 +124,25 @@ export default function OrdersPage() {
                       <td style={{ padding: "0.5rem 1rem" }}>
                         <s-stack gap="none">
                           {c.customText && (
-                            <s-text><strong>Text:</strong> {c.customText}</s-text>
+                            <s-text>
+                              <strong>Text:</strong> {c.customText}
+                            </s-text>
                           )}
                           {c.fontName && (
-                            <s-text><strong>Font:</strong> {c.fontName}</s-text>
+                            <s-text>
+                              <strong>Font:</strong> {c.fontName}
+                            </s-text>
                           )}
                         </s-stack>
                       </td>
                       {/* Preview thumbnail */}
                       <td style={{ padding: "0.5rem 1rem" }}>
                         {c.designImageUrl ? (
-                          <a href={c.designImageUrl} target="_blank" rel="noopener noreferrer">
+                          <a
+                            href={c.designImageUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
                             <s-thumbnail
                               src={c.designImageUrl}
                               alt="Design preview"
@@ -124,19 +157,27 @@ export default function OrdersPage() {
                       <td style={{ padding: "0.5rem 1rem" }}>
                         <s-stack direction="inline" gap="small">
                           {c.rawImageUrl && (
-                            <a href={c.rawImageUrl} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={c.rawImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               <s-button variant="tertiary">Raw Image</s-button>
                             </a>
                           )}
                           {c.designImageUrl && (
-                            <a href={c.designImageUrl} target="_blank" rel="noopener noreferrer">
+                            <a
+                              href={c.designImageUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
                               <s-button variant="primary">Design PNG</s-button>
                             </a>
                           )}
                         </s-stack>
                       </td>
                     </tr>
-                  ))
+                  )),
                 )}
               </tbody>
             </table>

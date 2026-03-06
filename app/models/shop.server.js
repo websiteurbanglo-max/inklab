@@ -1,17 +1,11 @@
-import { getDb } from "../firebase.server";
 import { FieldValue } from "firebase-admin/firestore";
-
-export interface Shop {
-  domain: string;
-  installedAt: FirebaseFirestore.Timestamp;
-  isActive: boolean;
-  planName?: string;
-}
+import { getDb } from "../firebase.server";
 
 const col = () => getDb().collection("shops");
 
-export async function upsertShop(domain: string): Promise<void> {
+export async function upsertShop(domain) {
   console.log(`[shop] upsertShop domain=${domain}`);
+
   try {
     await col().doc(domain).set(
       {
@@ -19,7 +13,7 @@ export async function upsertShop(domain: string): Promise<void> {
         isActive: true,
         installedAt: FieldValue.serverTimestamp(),
       },
-      { merge: true }
+      { merge: true },
     );
     console.log(`[shop] upsertShop OK domain=${domain}`);
   } catch (err) {
@@ -28,8 +22,9 @@ export async function upsertShop(domain: string): Promise<void> {
   }
 }
 
-export async function deactivateShop(domain: string): Promise<void> {
+export async function deactivateShop(domain) {
   console.log(`[shop] deactivateShop domain=${domain}`);
+
   try {
     await col().doc(domain).set({ isActive: false }, { merge: true });
     console.log(`[shop] deactivateShop OK domain=${domain}`);
@@ -39,7 +34,8 @@ export async function deactivateShop(domain: string): Promise<void> {
   }
 }
 
-export async function getAllShops(): Promise<Shop[]> {
+export async function getAllShops() {
   const snapshot = await col().orderBy("installedAt", "desc").get();
-  return snapshot.docs.map((doc) => doc.data() as Shop);
+
+  return snapshot.docs.map((doc) => doc.data());
 }

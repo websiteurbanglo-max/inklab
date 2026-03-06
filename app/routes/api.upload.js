@@ -1,8 +1,7 @@
-import type { ActionFunctionArgs } from "react-router";
-import { uploadToStorage } from "../firebase.server";
 import { v4 as uuidv4 } from "uuid";
+import { uploadToStorage } from "../firebase.server";
 
-function corsHeaders(origin?: string | null) {
+function corsHeaders(origin) {
   return {
     "Access-Control-Allow-Origin": origin ?? "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
@@ -10,7 +9,7 @@ function corsHeaders(origin?: string | null) {
   };
 }
 
-export const action = async ({ request }: ActionFunctionArgs) => {
+export const action = async ({ request }) => {
   const origin = request.headers.get("origin");
 
   // Handle OPTIONS preflight
@@ -29,33 +28,34 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!shop || !shop.includes(".myshopify.com")) {
     return Response.json(
       { error: "Missing or invalid shop parameter" },
-      { status: 400, headers: corsHeaders(origin) }
+      { status: 400, headers: corsHeaders(origin) },
     );
   }
 
   try {
     const contentType = request.headers.get("content-type") ?? "";
-    let buffer: Buffer;
-    let mimeType: string;
-    let ext: string;
+    let buffer;
+    let mimeType;
+    let ext;
 
     if (contentType.includes("application/json")) {
       // Canvas design: sent as { dataUrl: "data:image/png;base64,..." }
-      const body = await request.json() as { dataUrl: string };
-      const dataUrl: string = body.dataUrl;
+      const body = await request.json();
+      const dataUrl = body.dataUrl;
 
       if (!dataUrl || !dataUrl.startsWith("data:")) {
         return Response.json(
           { error: "Invalid dataUrl" },
-          { status: 400, headers: corsHeaders(origin) }
+          { status: 400, headers: corsHeaders(origin) },
         );
       }
 
       const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+
       if (!matches) {
         return Response.json(
           { error: "Malformed data URL" },
-          { status: 400, headers: corsHeaders(origin) }
+          { status: 400, headers: corsHeaders(origin) },
         );
       }
 
@@ -70,19 +70,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       if (!file || typeof file === "string") {
         return Response.json(
           { error: "No file provided" },
-          { status: 400, headers: corsHeaders(origin) }
+          { status: 400, headers: corsHeaders(origin) },
         );
       }
 
-      const fileObj = file as File;
+      const fileObj = file;
       const arrayBuffer = await fileObj.arrayBuffer();
+
       buffer = Buffer.from(arrayBuffer);
       mimeType = fileObj.type || "image/jpeg";
       ext = mimeType.includes("png") ? "png" : "jpg";
     } else {
       return Response.json(
         { error: "Unsupported content type" },
-        { status: 415, headers: corsHeaders(origin) }
+        { status: 415, headers: corsHeaders(origin) },
       );
     }
 
@@ -90,7 +91,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (buffer.length > 20 * 1024 * 1024) {
       return Response.json(
         { error: "File too large (max 20MB)" },
-        { status: 413, headers: corsHeaders(origin) }
+        { status: 413, headers: corsHeaders(origin) },
       );
     }
 
@@ -100,24 +101,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     return Response.json(
       { url: downloadUrl, id },
-      { headers: corsHeaders(origin) }
+      { headers: corsHeaders(origin) },
     );
   } catch (err) {
     console.error("Upload error:", err);
+
     return Response.json(
       { error: "Upload failed" },
-      { status: 500, headers: corsHeaders(origin) }
+      { status: 500, headers: corsHeaders(origin) },
     );
   }
 };
 
 // Support OPTIONS via loader as well (some clients use GET for CORS checks)
-export const loader = async ({ request }: ActionFunctionArgs) => {
+export const loader = async ({ request }) => {
   if (request.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
       headers: corsHeaders(request.headers.get("origin")),
     });
   }
+
   return new Response("Not Found", { status: 404 });
 };

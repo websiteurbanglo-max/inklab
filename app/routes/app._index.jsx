@@ -1,27 +1,29 @@
-﻿import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { getAllFonts } from "../models/font.server";
 import { getOrdersByShop } from "../models/order.server";
 import { upsertShop } from "../models/shop.server";
 
-export const loader = async ({ request }: LoaderFunctionArgs) => {
+export const loader = async ({ request }) => {
   console.log("[loader:app._index] START");
+
   try {
     const { session } = await authenticate.admin(request);
     const shop = session.shop;
-    console.log("[loader:app._index] Authenticated shop:", shop);
 
+    console.log("[loader:app._index] Authenticated shop:", shop);
     console.log("[loader:app._index] Upserting shop in Firestore");
     await upsertShop(shop);
     console.log("[loader:app._index] upsertShop done");
-
     console.log("[loader:app._index] Fetching fonts + recent orders");
     const [fonts, orders] = await Promise.all([
       getAllFonts(shop),
       getOrdersByShop(shop, 5),
     ]);
-    console.log(`[loader:app._index] fonts=${fonts.length} recentOrders=${orders.length}`);
+
+    console.log(
+      `[loader:app._index] fonts=${fonts.length} recentOrders=${orders.length}`,
+    );
 
     return {
       shop,
@@ -29,7 +31,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       activeFontCount: fonts.filter((f) => f.isActive).length,
       recentOrderCount: orders.length,
     };
-  } catch (err: unknown) {
+  } catch (err) {
     // Re-throw Response objects (302 redirects to /auth/login) silently — they are
     // the normal Shopify re-auth mechanism, not application errors.
     if (err instanceof Response) throw err;
@@ -40,7 +42,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
 export default function AppHome() {
   const { shop, fontCount, activeFontCount, recentOrderCount } =
-    useLoaderData<typeof loader>();
+    useLoaderData();
 
   return (
     <s-page heading="InkCanvas Customizer">
@@ -83,8 +85,8 @@ export default function AppHome() {
           <s-paragraph>
             <strong>Step 1 — Upload fonts</strong>
             <br />
-            Go to Fonts and upload any custom TTF, OTF, WOFF, or WOFF2 fonts
-            you want customers to use.
+            Go to Fonts and upload any custom TTF, OTF, WOFF, or WOFF2 fonts you
+            want customers to use.
           </s-paragraph>
           <s-paragraph>
             <strong>Step 2 — Activate the canvas widget</strong>
@@ -96,9 +98,9 @@ export default function AppHome() {
           <s-paragraph>
             <strong>Step 3 — Receive orders</strong>
             <br />
-            When customers personalize and purchase a product, the
-            customization data will appear in the Orders tab with download
-            links for the raw image and design PNG.
+            When customers personalize and purchase a product, the customization
+            data will appear in the Orders tab with download links for the raw
+            image and design PNG.
           </s-paragraph>
         </s-stack>
       </s-section>

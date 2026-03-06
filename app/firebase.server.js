@@ -1,31 +1,41 @@
 import admin from "firebase-admin";
-import type { Firestore } from "firebase-admin/firestore";
-import type { Storage } from "firebase-admin/storage";
 
-declare global {
-  // eslint-disable-next-line no-var
-  var _firebaseApp: admin.app.App | undefined;
-}
-
-function getFirebaseApp(): admin.app.App {
+function getFirebaseApp() {
   if (global._firebaseApp) return global._firebaseApp;
-
   // ── Startup diagnostics ────────────────────────────────────────────────
   console.log("[firebase] Initialising Firebase Admin SDK");
-  console.log("[firebase] FIREBASE_PROJECT_ID present:", !!process.env.FIREBASE_PROJECT_ID);
-  console.log("[firebase] FIREBASE_CLIENT_EMAIL present:", !!process.env.FIREBASE_CLIENT_EMAIL);
-  console.log("[firebase] FIREBASE_PRIVATE_KEY present:", !!process.env.FIREBASE_PRIVATE_KEY);
-  console.log("[firebase] FIREBASE_STORAGE_BUCKET present:", !!process.env.FIREBASE_STORAGE_BUCKET);
+  console.log(
+    "[firebase] FIREBASE_PROJECT_ID present:",
+    !!process.env.FIREBASE_PROJECT_ID,
+  );
+  console.log(
+    "[firebase] FIREBASE_CLIENT_EMAIL present:",
+    !!process.env.FIREBASE_CLIENT_EMAIL,
+  );
+  console.log(
+    "[firebase] FIREBASE_PRIVATE_KEY present:",
+    !!process.env.FIREBASE_PRIVATE_KEY,
+  );
+  console.log(
+    "[firebase] FIREBASE_STORAGE_BUCKET present:",
+    !!process.env.FIREBASE_STORAGE_BUCKET,
+  );
   // ─────────────────────────────────────────────────────────────────────
-
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-  if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
+  if (
+    !process.env.FIREBASE_PROJECT_ID ||
+    !process.env.FIREBASE_CLIENT_EMAIL ||
+    !privateKey
+  ) {
     const missing = [
       !process.env.FIREBASE_PROJECT_ID && "FIREBASE_PROJECT_ID",
       !process.env.FIREBASE_CLIENT_EMAIL && "FIREBASE_CLIENT_EMAIL",
       !privateKey && "FIREBASE_PRIVATE_KEY",
-    ].filter(Boolean).join(", ");
+    ]
+      .filter(Boolean)
+      .join(", ");
+
     console.error("[firebase] FATAL — missing env vars:", missing);
     throw new Error(`Missing Firebase environment variables: ${missing}`);
   }
@@ -39,7 +49,10 @@ function getFirebaseApp(): admin.app.App {
       }),
       storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
-    console.log("[firebase] Admin SDK initialised OK — project:", process.env.FIREBASE_PROJECT_ID);
+    console.log(
+      "[firebase] Admin SDK initialised OK — project:",
+      process.env.FIREBASE_PROJECT_ID,
+    );
   } catch (err) {
     console.error("[firebase] admin.initializeApp() FAILED:", err);
     throw err;
@@ -48,11 +61,11 @@ function getFirebaseApp(): admin.app.App {
   return global._firebaseApp;
 }
 
-export function getDb(): Firestore {
+export function getDb() {
   return getFirebaseApp().firestore();
 }
 
-export function getStorage(): Storage {
+export function getStorage() {
   return getFirebaseApp().storage();
 }
 
@@ -62,11 +75,7 @@ export function getStorage(): Storage {
  * @param destination  Storage path, e.g. "uploads/shop.myshopify.com/raw/abc.png"
  * @param contentType  MIME type
  */
-export async function uploadToStorage(
-  buffer: Buffer,
-  destination: string,
-  contentType: string
-): Promise<string> {
+export async function uploadToStorage(buffer, destination, contentType) {
   const bucket = getStorage().bucket();
   const file = bucket.file(destination);
 

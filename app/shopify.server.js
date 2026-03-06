@@ -6,16 +6,23 @@ import {
 } from "@shopify/shopify-app-react-router/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
 import prisma from "./db.server";
-
 // ── Startup diagnostics ────────────────────────────────────────────────────
 console.log("[shopify.server] Initialising Shopify app SDK");
-console.log("[shopify.server] SHOPIFY_API_KEY present:", !!process.env.SHOPIFY_API_KEY);
-console.log("[shopify.server] SHOPIFY_API_SECRET present:", !!process.env.SHOPIFY_API_SECRET);
-console.log("[shopify.server] SHOPIFY_APP_URL:", process.env.SHOPIFY_APP_URL || "(not set — will break OAuth)");
+console.log(
+  "[shopify.server] SHOPIFY_API_KEY present:",
+  !!process.env.SHOPIFY_API_KEY,
+);
+console.log(
+  "[shopify.server] SHOPIFY_API_SECRET present:",
+  !!process.env.SHOPIFY_API_SECRET,
+);
+console.log(
+  "[shopify.server] SHOPIFY_APP_URL:",
+  process.env.SHOPIFY_APP_URL || "(not set — will break OAuth)",
+);
 console.log("[shopify.server] SCOPES:", process.env.SCOPES || "(not set)");
 console.log("[shopify.server] API version: January26 (2026-01)");
 // ──────────────────────────────────────────────────────────────────────────
-
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
   apiSecretKey: process.env.SHOPIFY_API_SECRET || "",
