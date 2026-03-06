@@ -6,6 +6,19 @@ import {
 } from "react-router";
 import { useState, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
+import {
+  Page,
+  Card,
+  Banner,
+  BlockStack,
+  InlineStack,
+  Text,
+  Button,
+  Badge,
+  Modal,
+  TextField,
+  EmptyState,
+} from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import {
   getAllFonts,
@@ -172,15 +185,6 @@ export default function FontsPage() {
   const [fontName, setFontName] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const fileInputRef = useRef(null);
-  const fontNameInputId = "font-name-input";
-  // Open/close the s-modal web component imperatively via DOM property
-  const modalRef = useCallback(
-    (el) => {
-      if (!el) return;
-      el.open = modalOpen;
-    },
-    [modalOpen],
-  );
   const openModal = useCallback(() => {
     setFontName("");
     setSelectedFile(null);
@@ -200,219 +204,241 @@ export default function FontsPage() {
     fetcher.submit(fd, { method: "post", encType: "multipart/form-data" });
     closeModal();
   }, [fetcher, fontName, selectedFile, closeModal]);
+  const thStyle = {
+    textAlign: "left",
+    padding: "0.75rem 1rem",
+    fontSize: "0.8125rem",
+    fontWeight: 600,
+    color: "#6d7175",
+    background: "#f6f6f7",
+    whiteSpace: "nowrap",
+  };
+  const tdStyle = { padding: "0.75rem 1rem", verticalAlign: "middle" };
 
   return (
-    <s-page heading="Font Manager">
-      {/* s-button in primary-action slot */}
-      <s-button slot="primary-action" variant="primary" onClick={openModal}>
-        Upload Font
-      </s-button>
-
-      {/* Feedback banners */}
-      {actionData && "error" in actionData && actionData.error && (
-        <s-section padding="none">
-          <s-banner tone="critical">{actionData.error}</s-banner>
-        </s-section>
-      )}
-      {actionData && "message" in actionData && actionData.message && (
-        <s-section padding="none">
-          <s-banner tone="success">{actionData.message}</s-banner>
-        </s-section>
-      )}
-
-      {/* ── Built-in / System Fonts ─────────────────────────────────────── */}
-      <s-section heading="Default Fonts (Built-in)">
-        <s-paragraph>
-          These {systemFonts.length} fonts are available to every shop
-          automatically — no upload needed. They are always active and cannot be
-          removed.
-        </s-paragraph>
-        <s-table>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr>
-                <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                  Font Name
-                </th>
-                <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                  Category
-                </th>
-                <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {systemFonts.map((font) => (
-                <tr key={font.id}>
-                  <td style={{ padding: "0.5rem 1rem", fontWeight: 500 }}>
-                    {font.name}
-                  </td>
-                  <td style={{ padding: "0.5rem 1rem" }}>
-                    <s-badge tone="info">Built-in</s-badge>
-                  </td>
-                  <td style={{ padding: "0.5rem 1rem" }}>
-                    <s-badge tone="success">Active</s-badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </s-table>
-      </s-section>
-
-      {/* ── Custom / Shop-uploaded Fonts ─────────────────────────────────── */}
-      <s-section heading="Your Custom Fonts">
-        {customFonts.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "2rem 0" }}>
-            <s-stack gap="base">
-              <s-heading>No custom fonts uploaded yet</s-heading>
-              <s-paragraph tone="neutral">
-                Upload your brand fonts to add them alongside the built-in
-                defaults in the storefront font picker.
-              </s-paragraph>
-            </s-stack>
-          </div>
-        ) : (
-          <s-table>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                    Font Name
-                  </th>
-                  <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                    File
-                  </th>
-                  <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                    Status
-                  </th>
-                  <th style={{ textAlign: "left", padding: "0.5rem 1rem" }}>
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {customFonts.map((font) => (
-                  <tr key={font.id}>
-                    <td style={{ padding: "0.5rem 1rem" }}>{font.name}</td>
-                    <td style={{ padding: "0.5rem 1rem" }}>{font.fileName}</td>
-                    <td style={{ padding: "0.5rem 1rem" }}>
-                      <s-badge tone={font.isActive ? "success" : "neutral"}>
-                        {font.isActive ? "Active" : "Inactive"}
-                      </s-badge>
-                    </td>
-                    <td style={{ padding: "0.5rem 1rem" }}>
-                      <s-stack direction="inline" gap="small">
-                        <fetcher.Form method="post">
-                          <input type="hidden" name="intent" value="toggle" />
-                          <input type="hidden" name="fontId" value={font.id} />
-                          <input
-                            type="hidden"
-                            name="isActive"
-                            value={font.isActive ? "false" : "true"}
-                          />
-                          <s-button variant="tertiary" type="submit">
-                            {font.isActive ? "Deactivate" : "Activate"}
-                          </s-button>
-                        </fetcher.Form>
-                        <fetcher.Form method="post">
-                          <input type="hidden" name="intent" value="delete" />
-                          <input type="hidden" name="fontId" value={font.id} />
-                          <s-button
-                            variant="tertiary"
-                            tone="critical"
-                            type="submit"
-                          >
-                            Delete
-                          </s-button>
-                        </fetcher.Form>
-                      </s-stack>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </s-table>
+    <Page
+      title="Font Manager"
+      primaryAction={{ content: "Upload Font", onAction: openModal }}
+    >
+      <BlockStack gap="400">
+        {/* Feedback banners */}
+        {actionData && "error" in actionData && actionData.error && (
+          <Banner tone="critical">{actionData.error}</Banner>
         )}
-      </s-section>
+        {actionData && "message" in actionData && actionData.message && (
+          <Banner tone="success">{actionData.message}</Banner>
+        )}
 
-      {/* Info section */}
-      <s-section heading="About fonts">
-        <s-paragraph>
-          Your storefront font picker automatically includes all{" "}
-          {systemFonts.length} built-in fonts (Google Fonts, served from
-          Google&apos;s CDN — no upload needed). You can also upload your own
-          brand fonts in TTF, OTF, WOFF, or WOFF2 format; they will appear after
-          the built-in defaults in the picker. Deactivating a custom font hides
-          it from the storefront without deleting it.
-        </s-paragraph>
-      </s-section>
+        {/* ── Built-in / System Fonts ──────────────────────────────────── */}
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingMd" as="h2">
+              Default Fonts (Built-in)
+            </Text>
+            <Text as="p" tone="subdued">
+              These {systemFonts.length} fonts are available to every shop
+              automatically — no upload needed. They are always active and
+              cannot be removed.
+            </Text>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ borderBottom: "1px solid #e1e3e5" }}>
+                    <th style={thStyle}>Font Name</th>
+                    <th style={thStyle}>Preview</th>
+                    <th style={thStyle}>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {systemFonts.map((font) => (
+                    <tr
+                      key={font.id}
+                      style={{ borderBottom: "1px solid #f1f2f3" }}
+                    >
+                      <td style={tdStyle}>
+                        <Text as="p" fontWeight="semibold">
+                          {font.name}
+                        </Text>
+                      </td>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            fontFamily: `"${font.name}", sans-serif`,
+                            fontSize: "1.1rem",
+                            color: "#1a1a1a",
+                          }}
+                        >
+                          AaBbCc 123
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <Badge tone="success">Built-in</Badge>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </BlockStack>
+        </Card>
 
-      {/* Upload modal — using native dialog as s-modal equivalent */}
-      {/* s-modal web component */}
-      <s-modal ref={modalRef} heading="Upload a new font">
-        <s-stack gap="base">
-          {/* Font name field */}
-          <div>
-            <label
-              htmlFor={fontNameInputId}
-              style={{
-                display: "block",
-                marginBottom: "0.25rem",
-                fontWeight: 500,
-              }}
-            >
-              Display name
-            </label>
-            <input
-              id={fontNameInputId}
-              type="text"
+        {/* ── Custom / Shop-uploaded Fonts ─────────────────────────────── */}
+        <Card>
+          <BlockStack gap="300">
+            <Text variant="headingMd" as="h2">
+              Your Custom Fonts
+            </Text>
+            {customFonts.length === 0 ? (
+              <EmptyState
+                heading="No custom fonts uploaded yet"
+                image="https://cdn.shopify.com/s/files/1/0262/4071/2726/files/emptystate-files.png"
+                action={{ content: "Upload Font", onAction: openModal }}
+              >
+                <Text as="p" tone="subdued">
+                  Upload your brand fonts to add them alongside the built-in
+                  defaults in the storefront font picker.
+                </Text>
+              </EmptyState>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ borderBottom: "1px solid #e1e3e5" }}>
+                      <th style={thStyle}>Font Name</th>
+                      <th style={thStyle}>File</th>
+                      <th style={thStyle}>Status</th>
+                      <th style={thStyle}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customFonts.map((font) => (
+                      <tr
+                        key={font.id}
+                        style={{ borderBottom: "1px solid #f1f2f3" }}
+                      >
+                        <td style={tdStyle}>
+                          <Text as="p" fontWeight="semibold">
+                            {font.name}
+                          </Text>
+                        </td>
+                        <td style={tdStyle}>
+                          <Text as="p" tone="subdued">
+                            {font.fileName}
+                          </Text>
+                        </td>
+                        <td style={tdStyle}>
+                          <Badge tone={font.isActive ? "success" : "enabled"}>
+                            {font.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </td>
+                        <td style={tdStyle}>
+                          <InlineStack gap="200">
+                            <fetcher.Form method="post">
+                              <input
+                                type="hidden"
+                                name="intent"
+                                value="toggle"
+                              />
+                              <input
+                                type="hidden"
+                                name="fontId"
+                                value={font.id}
+                              />
+                              <input
+                                type="hidden"
+                                name="isActive"
+                                value={font.isActive ? "false" : "true"}
+                              />
+                              <Button variant="plain" size="slim" submit>
+                                {font.isActive ? "Deactivate" : "Activate"}
+                              </Button>
+                            </fetcher.Form>
+                            <fetcher.Form method="post">
+                              <input
+                                type="hidden"
+                                name="intent"
+                                value="delete"
+                              />
+                              <input
+                                type="hidden"
+                                name="fontId"
+                                value={font.id}
+                              />
+                              <Button
+                                variant="plain"
+                                tone="critical"
+                                size="slim"
+                                submit
+                              >
+                                Delete
+                              </Button>
+                            </fetcher.Form>
+                          </InlineStack>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </BlockStack>
+        </Card>
+
+        {/* Info card */}
+        <Card>
+          <Text as="p" tone="subdued">
+            Your storefront font picker automatically includes all{" "}
+            {systemFonts.length} built-in fonts (Google Fonts, served from
+            Google&apos;s CDN). Upload your own brand fonts in TTF, OTF, WOFF,
+            or WOFF2 format; they appear after the built-in defaults in the
+            picker. Deactivating a custom font hides it from the storefront
+            without deleting it.
+          </Text>
+        </Card>
+      </BlockStack>
+
+      {/* Upload Modal */}
+      <Modal
+        open={modalOpen}
+        onClose={closeModal}
+        title="Upload a new font"
+        primaryAction={{
+          content: isSubmitting ? "Uploading…" : "Upload",
+          disabled: isSubmitting || !fontName || !selectedFile,
+          onAction: handleUpload,
+        }}
+        secondaryActions={[{ content: "Cancel", onAction: closeModal }]}
+      >
+        <Modal.Section>
+          <BlockStack gap="400">
+            <TextField
+              label="Display name"
               value={fontName}
-              onChange={(e) => setFontName(e.target.value)}
+              onChange={setFontName}
               placeholder="e.g. Pacifico Script"
               autoComplete="off"
-              style={{
-                width: "100%",
-                padding: "0.5rem",
-                boxSizing: "border-box",
-              }}
             />
-          </div>
-
-          {/* File picker */}
-          <s-stack gap="small">
-            <s-text>Font file (TTF, OTF, WOFF, WOFF2)</s-text>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".ttf,.otf,.woff,.woff2"
-              onChange={handleFileChange}
-              style={{ display: "block" }}
-            />
-            {selectedFile && (
-              <s-text tone="neutral">
-                Selected: {selectedFile.name} (
-                {(selectedFile.size / 1024).toFixed(1)} KB)
-              </s-text>
-            )}
-          </s-stack>
-        </s-stack>
-
-        {/* Modal footer actions */}
-        <s-button-group slot="primary-action">
-          <s-button
-            variant="primary"
-            disabled={isSubmitting || !fontName || !selectedFile}
-            onClick={handleUpload}
-          >
-            {isSubmitting ? "Uploading…" : "Upload"}
-          </s-button>
-          <s-button variant="secondary" onClick={closeModal}>
-            Cancel
-          </s-button>
-        </s-button-group>
-      </s-modal>
-    </s-page>
+            <BlockStack gap="200">
+              <Text as="p" fontWeight="medium">
+                Font file (TTF, OTF, WOFF, WOFF2)
+              </Text>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".ttf,.otf,.woff,.woff2"
+                onChange={handleFileChange}
+                style={{ display: "block" }}
+              />
+              {selectedFile && (
+                <Text as="p" tone="subdued">
+                  Selected: {selectedFile.name} (
+                  {(selectedFile.size / 1024).toFixed(1)} KB)
+                </Text>
+              )}
+            </BlockStack>
+          </BlockStack>
+        </Modal.Section>
+      </Modal>
+    </Page>
   );
 }
