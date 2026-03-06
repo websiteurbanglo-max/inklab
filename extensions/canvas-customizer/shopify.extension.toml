@@ -8,12 +8,6 @@ type = "theme"
 [settings]
 
   [[settings.fields]]
-  key = "app_url"
-  type = "text"
-  label = "App URL (your deployed backend URL)"
-  default = ""
-
-  [[settings.fields]]
   key = "canvas_size"
   type = "range"
   label = "Canvas size (px)"
