@@ -45,6 +45,14 @@
   function boot() {
     var root = document.getElementById(ROOT_ID);
     if (!root) return;
+
+    // Responsive: shrink canvas to fit narrow screens before Fabric initialises.
+    // Fabric sets inline pixel dimensions on its wrapper div, so CSS alone can't rescue it.
+    var vw = window.innerWidth || document.documentElement.clientWidth || 600;
+    if (vw < 640) {
+      CANVAS_SZ = Math.max(Math.min(CANVAS_SZ, vw - 40), 220);
+    }
+
     root.innerHTML = buildSkeletonHTML();
     var canvas = root.querySelector('#ikc-canvas');
     if (canvas) canvas.style.background = '#f9fafb';
@@ -156,7 +164,23 @@
       textColor:    '#1a1a1a',
       rawFile:      null,   // File object — set on file select, uploaded only at cart submit
       blobUrl:      '',    // revocable blob URL for canvas preview (no server needed)
+      hintObj:      null,  // faint placeholder removed once content is added
     };
+
+    // Show a faint hint so the user can see the canvas is ready
+    state.hintObj = new fabric.IText('Add text or image to preview', {
+      left:       CANVAS_SZ / 2,
+      top:        CANVAS_SZ / 2,
+      originX:    'center',
+      originY:    'center',
+      fontSize:   Math.max(13, Math.round(CANVAS_SZ * 0.033)),
+      fontFamily: 'sans-serif',
+      fill:       '#c4c9d4',
+      selectable: false,
+      evented:    false,
+    });
+    fc.add(state.hintObj);
+    fc.renderAll();
 
     if (SHOW_FONTS)  setupFonts(fc, state);
     setupText(fc, state);
@@ -243,6 +267,7 @@
       var val = input.value;
       if (!state.textObj) {
         if (!val) return;
+        if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
         state.textObj = new fabric.IText(val, {
           left:       CANVAS_SZ / 2,
           top:        Math.round(CANVAS_SZ * 0.78),
@@ -316,6 +341,7 @@
     // Fabric.js v6: fromURL returns a Promise
     fabric.Image.fromURL(url, { crossOrigin: 'anonymous' })
       .then(function (img) {
+        if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
         if (state.imageObj) fc.remove(state.imageObj);
 
         var maxDim = CANVAS_SZ * 0.85;
