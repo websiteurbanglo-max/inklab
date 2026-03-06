@@ -106,4 +106,4 @@ jobs:
           gh pr view --json mergedAt -q ".mergedAt" javascript_updates | grep -E "^$" || \
           gh pr create -B javascript -H javascript_updates --title 'Convert template to Javascript' --body 'This is an automated PR that converts the latest changes from Typescript to Javascript'
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.GH_PAT }}
