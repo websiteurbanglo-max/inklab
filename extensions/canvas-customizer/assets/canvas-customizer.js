@@ -57,8 +57,10 @@
     }
 
     root.innerHTML = buildSkeletonHTML();
-    var canvas = root.querySelector('#ikc-canvas');
-    if (canvas) canvas.style.background = '#f9fafb';
+    // NOTE: do NOT set canvas.style.background here — Fabric v6 copies lowerCanvasEl.style.cssText
+    // onto the upper canvas, which would give it a solid background that hides all drawn content.
+    // The backgroundColor option on the Fabric Canvas constructor handles the background correctly.
+
     // Fabric.js is loaded via asset_url in the Liquid template (served from Shopify CDN).
     // If for any reason it's not yet defined, wait briefly and retry.
     if (window.fabric) {
