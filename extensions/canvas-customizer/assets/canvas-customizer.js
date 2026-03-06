@@ -268,7 +268,7 @@
       if (!state.textObj) {
         if (!val) return;
         if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
-        state.textObj = new fabric.IText(val, {
+        state.textObj = new state.FabricText(val, {
           left:       CANVAS_SZ / 2,
           top:        Math.round(CANVAS_SZ * 0.78),
           originX:    'center',
