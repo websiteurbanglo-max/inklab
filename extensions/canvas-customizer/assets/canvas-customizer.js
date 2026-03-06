@@ -35,8 +35,6 @@
   var SHOW_FONTS  = cfg.showFonts  !== false && cfg.showFonts  !== 'false';
   var SHOW_UPLOAD = cfg.showUpload !== false && cfg.showUpload !== 'false';
   var PLACEHOLDER = cfg.placeholder || 'Enter your text here...';
-  var FABRIC_CDN  = 'https://cdn.jsdelivr.net/npm/fabric@6/dist/fabric.min.js';
-
   // ── Boot ───────────────────────────────────────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);
@@ -439,19 +437,6 @@
   }
 
   // ── Utilities ───────────────────────────────────────────────────────────
-  function loadScript(src, cb, onErr) {
-    if (document.querySelector('script[src="' + src + '"]')) { cb(); return; }
-    var s   = document.createElement('script');
-    s.src   = src;
-    s.async = true;
-    s.onload  = cb;
-    s.onerror = function () {
-      console.error('[InkCanvas] Failed to load:', src);
-      if (onErr) onErr();
-    };
-    document.head.appendChild(s);
-  }
-
   function escAttr(str) { return String(str).replace(/"/g, '&quot;'); }
   function escHtml(str) {
     return String(str)

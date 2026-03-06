@@ -21,6 +21,9 @@ pnpm-lock.yaml
 
 /extensions/*/dist
 
+# Bundled third-party assets (not linted)
+extensions/canvas-customizer/assets/fabric.min.js
+
 *.md
 
 # Ignore shopify files created during app dev
