@@ -150,7 +150,7 @@
     canvasEl.height = CANVAS_SZ;
 
     var fc = new fabric.Canvas('ikc-canvas', {
-      backgroundColor: '#ffffff',
+      backgroundColor: '#f8f9fa',
       preserveObjectStacking: true,
       width: CANVAS_SZ,
       height: CANVAS_SZ,

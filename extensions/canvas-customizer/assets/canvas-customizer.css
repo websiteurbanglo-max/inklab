@@ -28,8 +28,7 @@
   flex: 0 0 auto;
   display: flex;
   justify-content: center;
-  max-width: 100%;
-  overflow: hidden;
+  align-items: flex-start;
 }
 
 /* Fabric.js wraps the <canvas> in a .canvas-container div — style that, not the raw canvas */
@@ -37,8 +36,6 @@
   border: 2px solid #e5e7eb;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
-  max-width: 100%;
 }
 
 .ikc-canvas-col canvas {
@@ -192,9 +189,8 @@
 }
 
 /* ── Responsive ── */
-/* Stacking handled by flex-wrap + JS responsive CANVAS_SZ in boot(). */
-/* On narrow screens JS sets CANVAS_SZ = viewport - 40px before Fabric init. */
-@container (max-width: 600px) {
+/* JS in boot() clamps CANVAS_SZ to viewport width on narrow screens before Fabric init. */
+@container (max-width: 620px) {
   .ikc-wrap {
     flex-direction: column;
   }
@@ -202,5 +198,17 @@
   .ikc-canvas-col {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* Hard fallback for themes where container queries don't fire */
+@media (max-width: 640px) {
+  .ikc-wrap {
+    flex-direction: column !important;
+  }
+
+  .ikc-canvas-col {
+    width: 100% !important;
+    justify-content: center !important;
   }
 }
