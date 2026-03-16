@@ -1,494 +1,538 @@
 /**
- * InkCanvas Canvas Customizer – Storefront widget
- * Injected via Theme App Extension block.
- * Compatible with Fabric.js v6 (loaded from CDN at runtime).
+ * InkCanvas Canvas Customizer – Storefront popup widget
+ * Requires Fabric.js v6 loaded via asset_url in the Liquid block.
  */
 /* global fabric */
 (function () {
   'use strict';
 
-  // ── Read config written by the Liquid block ─────────────────────────────
-  // Primary source: window.InkCanvasConfig (set by the Liquid block).
-  // Fallback: read from the root .inkcanvas-root element's data-* attributes.
-  var cfg = window.InkCanvasConfig || {};
+  var MAX_PREVIEW_PX = 200; // max preview thumbnail size in px (for largest variant)
 
-  if (!cfg.appUrl || !cfg.shop || !cfg.rootId) {
-    var rootEl = document.querySelector('.inkcanvas-root[data-shop]');
-    if (rootEl) {
-      cfg = {
-        rootId: rootEl.id || 'inkcanvas-root',
-        appUrl: 'https://inklab-production.up.railway.app',
-        shop: rootEl.getAttribute('data-shop') || '',
-        canvasSize: rootEl.getAttribute('data-canvas-size') || 500,
-        showFonts: rootEl.getAttribute('data-show-fonts'),
-        showUpload: rootEl.getAttribute('data-show-upload'),
-        placeholder: rootEl.getAttribute('data-placeholder') || 'Enter your text here...',
-      };
-      window.InkCanvasConfig = cfg;
-    }
-  }
-
-  var ROOT_ID   = cfg.rootId   || 'inkcanvas-root';
-  var APP_URL   = (cfg.appUrl  || '').replace(/\/$/, '');
-  var SHOP      = cfg.shop     || (window.Shopify && window.Shopify.shop) || '';
-  var CANVAS_SZ = parseInt(cfg.canvasSize, 10) || 500;
-  var SHOW_FONTS  = cfg.showFonts  !== false && cfg.showFonts  !== 'false';
-  var SHOW_UPLOAD = cfg.showUpload !== false && cfg.showUpload !== 'false';
-  var PLACEHOLDER = cfg.placeholder || 'Enter your text here...';
-  // ── Boot ───────────────────────────────────────────────────────────────
+  // ── Boot: wait for DOM, then init each block ──────────────────────────────
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', bootAll);
   } else {
-    boot();
+    bootAll();
   }
 
-  function boot() {
-    var root = document.getElementById(ROOT_ID);
+  function bootAll() {
+    var configs = window.InkCanvasConfig;
+    if (!configs || typeof configs !== 'object') return;
+
+    Object.keys(configs).forEach(function (blockId) {
+      var cfg = configs[blockId];
+      if (cfg && cfg.blockId) {
+        initBlock(cfg);
+      }
+    });
+  }
+
+  // ── Per-block init ────────────────────────────────────────────────────────
+  function initBlock(cfg) {
+    var blockId    = cfg.blockId;
+    var root       = document.getElementById('inkcanvas-root-' + blockId);
     if (!root) return;
 
-    // Measure the actual rendered container width BEFORE populating innerHTML.
-    // This is far more accurate than window.innerWidth which ignores theme margins.
-    var rect = root.getBoundingClientRect();
-    var containerWidth = rect.width || root.clientWidth || window.innerWidth || 600;
-    // Subtract our 20px padding on each side (40px total).
-    var innerWidth = Math.round(containerWidth - 40);
-    if (innerWidth > 0 && innerWidth < CANVAS_SZ) {
-      CANVAS_SZ = Math.max(innerWidth, 220);
-    }
+    var APP_URL    = (cfg.appUrl  || '').replace(/\/$/, '');
+    var PROXY_BASE = (cfg.proxyBase || '/apps/inkcanvas').replace(/\/$/, '');
+    var SHOP       = cfg.shop || (window.Shopify && window.Shopify.shop) || '';
+    var PRODUCT_ID = cfg.productId || '';
+    var CANVAS_SZ  = parseInt(cfg.canvasSize, 10) || 500;
+    var SHOW_FONTS  = cfg.showFonts  !== false && cfg.showFonts  !== 'false';
+    var SHOW_UPLOAD = cfg.showUpload !== false && cfg.showUpload !== 'false';
 
-    root.innerHTML = buildSkeletonHTML();
-    // NOTE: do NOT set canvas.style.background here — Fabric v6 copies lowerCanvasEl.style.cssText
-    // onto the upper canvas, which would give it a solid background that hides all drawn content.
-    // The backgroundColor option on the Fabric Canvas constructor handles the background correctly.
+    // Element references (all scoped by blockId)
+    var openBtn     = document.getElementById('ikc-open-btn-' + blockId);
+    var modal       = document.getElementById('ikc-modal-' + blockId);
+    var closeBtn    = document.getElementById('ikc-close-btn-' + blockId);
+    var cancelBtn   = document.getElementById('ikc-cancel-btn-' + blockId);
+    var saveBtn     = document.getElementById('ikc-save-btn-' + blockId);
+    var editBtn     = document.getElementById('ikc-edit-btn-' + blockId);
+    var previewArea = document.getElementById('ikc-preview-' + blockId);
+    var previewImg  = document.getElementById('ikc-preview-img-' + blockId);
+    var errorMsg    = document.getElementById('ikc-modal-error-' + blockId);
+    var popupVariantSel = document.getElementById('ikc-variant-select-' + blockId);
 
-    // Fabric.js is loaded via asset_url in the Liquid template (served from Shopify CDN).
-    // If for any reason it's not yet defined, wait briefly and retry.
-    if (window.fabric) {
-      initWidget(root);
-    } else {
-      var attempts = 0;
-      var poll = setInterval(function () {
-        attempts++;
-        if (window.fabric) {
-          clearInterval(poll);
-          initWidget(root);
-        } else if (attempts > 50) {
-          clearInterval(poll);
-          showWidgetError(root, 'Canvas failed to load. Please refresh the page.');
-        }
-      }, 100);
-    }
-  }
+    if (!openBtn || !modal) return;
 
-  function showWidgetError(root, msg) {
-    var el = root.querySelector('#ikc-error-msg');
-    if (!el) {
-      el = document.createElement('p');
-      el.id = 'ikc-error-msg';
-      el.className = 'ikc-error-msg';
-      root.insertBefore(el, root.firstChild);
-    }
-    el.textContent = msg;
-  }
-
-  function clearWidgetError(root) {
-    var el = root.querySelector('#ikc-error-msg');
-    if (el) el.textContent = '';
-  }
-
-  // ── HTML template ──────────────────────────────────────────────────────
-  function buildSkeletonHTML() {
-    var fontBlock = SHOW_FONTS
-      ? '<div class="ikc-group">'
-        + '<label class="ikc-label" for="ikc-font-select">Font style</label>'
-        + '<select id="ikc-font-select" class="ikc-select"><option value="">Loading fonts…</option></select>'
-        + '</div>'
-      : '';
-
-    var colorBlock = '<div class="ikc-group">'
-      + '<label class="ikc-label" for="ikc-color-input">Text color</label>'
-      + '<div class="ikc-color-row">'
-      + '<input id="ikc-color-input" class="ikc-color-swatch" type="color" value="#1a1a1a" />'
-      + '<span id="ikc-color-hex" class="ikc-color-hex">#1a1a1a</span>'
-      + '</div>'
-      + '</div>';
-
-    var uploadBlock = SHOW_UPLOAD
-      ? '<div class="ikc-group">'
-        + '<label class="ikc-label">Upload image</label>'
-        + '<label class="ikc-upload-btn" for="ikc-img-input">'
-        + '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
-        + '<span id="ikc-upload-label">Choose image (PNG / JPG)</span>'
-        + '</label>'
-        + '<input id="ikc-img-input" type="file" accept="image/png,image/jpeg,image/webp" style="display:none" />'
-        + '</div>'
-      : '';
-
-    return '<p id="ikc-error-msg" class="ikc-error-msg" style="display:none"></p>'
-      + '<div class="ikc-wrap">'
-      + '<div class="ikc-canvas-col">'
-      + '<canvas id="ikc-canvas"></canvas>'
-      + '</div>'
-      + '<div class="ikc-controls-col">'
-      + '<h3 class="ikc-heading">Personalize your product</h3>'
-      + '<div class="ikc-group">'
-      + '<label class="ikc-label" for="ikc-text-input">Your text</label>'
-      + '<input id="ikc-text-input" class="ikc-input" type="text" placeholder="' + PLACEHOLDER + '" maxlength="80" />'
-      + '</div>'
-      + colorBlock
-      + fontBlock
-      + uploadBlock
-      + '<p class="ikc-note">Live preview updates as you type. Final design is printed in high resolution.</p>'
-      + '</div>'
-      + '</div>';
-  }
-
-  // ── Widget init ─────────────────────────────────────────────────────────
-  function initWidget(root) {
-    if (typeof fabric === 'undefined') {
-      console.error('[InkCanvas] Fabric.js failed to load.');
-      return;
-    }
-
-    var canvasEl = document.getElementById('ikc-canvas');
-    canvasEl.width  = CANVAS_SZ;
-    canvasEl.height = CANVAS_SZ;
-
-    var fc = new fabric.Canvas(canvasEl, {
-      backgroundColor: '#f8f9fa',
-      preserveObjectStacking: true,
-      width: CANVAS_SZ,
-      height: CANVAS_SZ,
-    });
-
-    // Ensure the wrapper div Fabric inserts always shows at the correct size.
-    if (fc.wrapperEl) {
-      fc.wrapperEl.style.width  = CANVAS_SZ + 'px';
-      fc.wrapperEl.style.height = CANVAS_SZ + 'px';
-    }
-
+    // Per-block state
     var state = {
-      textObj:      null,
-      imageObj:     null,
-      fontFamily:   'sans-serif',
-      fontName:     '',
-      textColor:    '#1a1a1a',
-      rawFile:      null,   // File object — set on file select, uploaded only at cart submit
-      blobUrl:      '',    // revocable blob URL for canvas preview (no server needed)
-      hintObj:      null,  // faint placeholder removed once content is added
+      fc:         null,   // Fabric.js canvas instance
+      textObj:    null,
+      imageObj:   null,
+      hintObj:    null,
+      fontFamily: 'sans-serif',
+      fontName:   '',
+      textColor:  '#1a1a1a',
+      rawFile:    null,
+      blobUrl:    '',
+      savedDataUrl: '',   // last saved canvas PNG (data URL)
+      selectedVariantId:    '',
+      selectedVariantTitle: '',
+      canvasSz:   CANVAS_SZ,
+      remoteFonts: null,
     };
 
-    // Faint hint text — uses fabric.Text which is confirmed available in v6
-    state.hintObj = new fabric.Text('Add text or image to preview', {
-      left:       CANVAS_SZ / 2,
-      top:        CANVAS_SZ / 2,
-      originX:    'center',
-      originY:    'center',
-      fontSize:   Math.max(13, Math.round(CANVAS_SZ * 0.033)),
-      fontFamily: 'sans-serif',
-      fill:       '#c4c9d4',
-      selectable: false,
-      evented:    false,
-    });
-    fc.add(state.hintObj);
-    fc.renderAll();
+    // ── Fetch per-product config from App Proxy ──────────────────────────
+    var configUrl = PROXY_BASE + '/config?shop=' + encodeURIComponent(SHOP) + '&product_id=' + encodeURIComponent(PRODUCT_ID);
 
-    if (SHOW_FONTS)  setupFonts(fc, state);
-    setupText(fc, state);
-    setupColorPicker(fc, state);
-    if (SHOW_UPLOAD) setupImageUpload(fc, state, root);
-    setupCartInterception(fc, state, root);
-  }
-
-  // ── Font manager ────────────────────────────────────────────────────────
-  function setupFonts(fc, state) {
-    var select = document.getElementById('ikc-font-select');
-    if (!select || !APP_URL || !SHOP) return;
-
-    fetch(APP_URL + '/api/fonts?shop=' + encodeURIComponent(SHOP))
-      .then(function (r) { return r.json(); })
-      .then(function (fonts) {
-        if (!Array.isArray(fonts) || fonts.length === 0) {
-          select.innerHTML = '<option value="">No fonts configured</option>';
-          return;
+    fetch(configUrl)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (remoteConfig) {
+        if (remoteConfig) {
+          if (remoteConfig.canvasSize) CANVAS_SZ = parseInt(remoteConfig.canvasSize, 10) || CANVAS_SZ;
+          state.remoteFonts = remoteConfig.fonts || null;
         }
-        select.innerHTML = fonts.map(function (f) {
-          return '<option value="' + escAttr(f.url) + '" data-name="' + escAttr(f.name) + '">' + escHtml(f.name) + '</option>';
-        }).join('');
-
-        // Load and apply the first font immediately
-        var first = fonts[0];
-        loadAndApplyFont(fc, state, first.url, first.name);
-
-        select.addEventListener('change', function () {
-          var opt = select.options[select.selectedIndex];
-          if (opt && opt.value) {
-            loadAndApplyFont(fc, state, opt.value, opt.dataset.name || opt.text);
-          }
-        });
-      })
-      .catch(function (err) {
-        console.warn('[InkCanvas] Font fetch failed:', err);
-        select.innerHTML = '<option value="">Default font</option>';
-      });
-  }
-
-  function loadAndApplyFont(fc, state, url, name) {
-    // Sanitize name for use as CSS font-family
-    var safeName = 'ikc-' + name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
-
-    // Inject @font-face only once
-    if (!document.getElementById('ikc-ff-' + safeName)) {
-      var style = document.createElement('style');
-      style.id  = 'ikc-ff-' + safeName;
-      style.textContent = '@font-face { font-family: "' + safeName + '"; src: url("' + url + '"); font-display: swap; }';
-      document.head.appendChild(style);
-    }
-
-    // Use FontFace API for reliable load detection
-    if (typeof FontFace !== 'undefined') {
-      var ff = new FontFace(safeName, 'url(' + url + ')');
-      ff.load().then(function (loaded) {
-        document.fonts.add(loaded);
-        applyFontToCanvas(fc, state, safeName, name);
-      }).catch(function () {
-        // Fallback: delay and hope the font loaded via <style>
-        setTimeout(function () { applyFontToCanvas(fc, state, safeName, name); }, 600);
-      });
-    } else {
-      setTimeout(function () { applyFontToCanvas(fc, state, safeName, name); }, 600);
-    }
-  }
-
-  function applyFontToCanvas(fc, state, safeName, displayName) {
-    state.fontFamily = safeName;
-    state.fontName   = displayName;
-    if (state.textObj) {
-      state.textObj.set('fontFamily', safeName);
-      fc.renderAll();
-    }
-  }
-
-  // ── Text layer ──────────────────────────────────────────────────────────
-  function setupText(fc, state) {
-    var input = document.getElementById('ikc-text-input');
-    if (!input) return;
-
-    input.addEventListener('input', function () {
-      var val = input.value;
-      if (!state.textObj) {
-        if (!val) return;
-        if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
-        state.textObj = new fabric.Text(val, {
-          left:       CANVAS_SZ / 2,
-          top:        Math.round(CANVAS_SZ * 0.78),
-          originX:    'center',
-          originY:    'center',
-          fontSize:   Math.round(CANVAS_SZ * 0.075),
-          fontFamily: state.fontFamily,
-          fill:       state.textColor,
-          textAlign:  'center',
-        });
-        fc.add(state.textObj);
-        fc.setActiveObject(state.textObj);
-      } else {
-        state.textObj.set({ text: val, fontFamily: state.fontFamily });
-      }
-      fc.renderAll();
-    });
-  }
-
-  // ── Color picker ────────────────────────────────────────────────────────
-  function setupColorPicker(fc, state) {
-    var picker = document.getElementById('ikc-color-input');
-    var hexLabel = document.getElementById('ikc-color-hex');
-    if (!picker) return;
-
-    picker.addEventListener('input', function () {
-      var color = picker.value;
-      state.textColor = color;
-      if (hexLabel) hexLabel.textContent = color;
-      if (state.textObj) {
-        state.textObj.set({ fill: color });
-        fc.renderAll();
-      }
-    });
-  }
-
-  // ── Image upload ────────────────────────────────────────────────────────
-  // The image is previewed on canvas instantly using a local blob URL.
-  // The actual upload to Firebase only happens at cart submit time.
-  function setupImageUpload(fc, state, root) {
-    var input     = document.getElementById('ikc-img-input');
-    var labelSpan = document.getElementById('ikc-upload-label');
-    if (!input) return;
-
-    input.addEventListener('change', function () {
-      var file = input.files && input.files[0];
-      if (!file) return;
-
-      // Validate size (max 20 MB)
-      if (file.size > 20 * 1024 * 1024) {
-        showWidgetError(root, 'Image must be smaller than 20 MB.');
-        return;
-      }
-
-      clearWidgetError(root);
-
-      // Revoke previous blob URL to free memory
-      if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
-
-      // Create a local blob URL — no server call needed for preview
-      var blobUrl = URL.createObjectURL(file);
-      state.rawFile = file;
-      state.blobUrl = blobUrl;
-
-      placeImageOnCanvas(fc, state, blobUrl, file.name, labelSpan, root);
-    });
-  }
-
-  function placeImageOnCanvas(fc, state, url, fileName, labelSpan, root) {
-    // Fabric.js v6: fromURL returns a Promise
-    fabric.Image.fromURL(url, { crossOrigin: 'anonymous' })
-      .then(function (img) {
-        if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
-        if (state.imageObj) fc.remove(state.imageObj);
-
-        var maxDim = CANVAS_SZ * 0.85;
-        var scale  = Math.min(maxDim / (img.width || 1), maxDim / (img.height || 1));
-
-        img.set({
-          left:    CANVAS_SZ / 2,
-          top:     CANVAS_SZ / 2,
-          originX: 'center',
-          originY: 'center',
-          scaleX:  scale,
-          scaleY:  scale,
-        });
-
-        state.imageObj = img;
-        fc.add(img);
-        if (state.textObj) fc.bringObjectToFront(state.textObj);
-        fc.renderAll();
-
-        if (labelSpan) labelSpan.textContent = fileName;
       })
       .catch(function () {
-        console.error('[InkCanvas] Failed to load image from URL:', url);
-        if (labelSpan) labelSpan.textContent = 'Image load failed – try again';
-        if (root) showWidgetError(root, 'Failed to display image on canvas.');
+        // Config fetch failure is non-fatal — use defaults
       });
-  }
 
-  // ── Add to Cart intercept ───────────────────────────────────────────────
-  // At submit time we upload two things to Firebase in parallel:
-  //   1. The raw customer image file (for merchant reference)
-  //   2. The canvas export PNG (the actual print-ready design)
-  // During the live preview phase, no server calls are made.
-  function setupCartInterception(fc, state, root) {
-    // Find the product form — works with most Shopify themes
-    var form = findProductForm(root);
-    if (!form) {
-      console.warn('[InkCanvas] Could not find product form. Cart intercept skipped.');
-      return;
+    // ── Variant sync setup ────────────────────────────────────────────────
+    var pageVariantInput = findPageVariantInput();
+
+    function findPageVariantInput() {
+      var form = document.querySelector('form[action*="/cart/add"]');
+      if (!form) return null;
+      return form.querySelector('select[name="id"], input[name="id"][type="hidden"]');
     }
 
-    form.addEventListener('submit', function (e) {
-      var textInput = document.getElementById('ikc-text-input');
+    // Set initial selected variant from page
+    if (popupVariantSel) {
+      if (pageVariantInput && pageVariantInput.value) {
+        popupVariantSel.value = pageVariantInput.value;
+      }
+      var firstOpt = popupVariantSel.options[popupVariantSel.selectedIndex];
+      if (firstOpt) {
+        state.selectedVariantId    = firstOpt.value;
+        state.selectedVariantTitle = firstOpt.getAttribute('data-title') || firstOpt.text;
+      }
+
+      // Sync popup variant → page variant
+      popupVariantSel.addEventListener('change', function () {
+        var opt = popupVariantSel.options[popupVariantSel.selectedIndex];
+        if (!opt) return;
+        state.selectedVariantId    = opt.value;
+        state.selectedVariantTitle = opt.getAttribute('data-title') || opt.text;
+        if (pageVariantInput) {
+          pageVariantInput.value = opt.value;
+          pageVariantInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+    }
+
+    // Sync page variant → popup variant selector
+    if (pageVariantInput) {
+      pageVariantInput.addEventListener('change', function () {
+        if (popupVariantSel && pageVariantInput.value) {
+          popupVariantSel.value = pageVariantInput.value;
+          var opt = popupVariantSel.options[popupVariantSel.selectedIndex];
+          if (opt) {
+            state.selectedVariantId    = opt.value;
+            state.selectedVariantTitle = opt.getAttribute('data-title') || opt.text;
+          }
+        }
+      });
+    }
+
+    // ── Modal open/close ─────────────────────────────────────────────────
+    openBtn.addEventListener('click', function () { openModal(); });
+    if (closeBtn)  closeBtn.addEventListener('click',  function () { closeModal(); });
+    if (cancelBtn) cancelBtn.addEventListener('click', function () { closeModal(); });
+    if (editBtn)   editBtn.addEventListener('click',   function () { openModal(); });
+
+    // Close on overlay click (outside the modal box)
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeModal();
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+    });
+
+    function openModal() {
+      modal.classList.add('is-open');
+      modal.setAttribute('aria-hidden', 'false');
+      document.body.style.overflow = 'hidden';
+
+      if (!state.fc) {
+        if (window.fabric) {
+          initCanvas();
+        } else {
+          var attempts = 0;
+          var poll = setInterval(function () {
+            attempts++;
+            if (window.fabric) {
+              clearInterval(poll);
+              initCanvas();
+            } else if (attempts > 50) {
+              clearInterval(poll);
+              showError('Canvas engine failed to load. Please refresh.');
+            }
+          }, 100);
+        }
+      }
+    }
+
+    function closeModal() {
+      modal.classList.remove('is-open');
+      modal.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+    }
+
+    // ── Canvas init ───────────────────────────────────────────────────────
+    function initCanvas() {
+      if (typeof fabric === 'undefined') { showError('Canvas engine not loaded.'); return; }
+      if (state.fc) return;
+
+      var canvasEl = document.getElementById('ikc-canvas-' + blockId);
+      if (!canvasEl) return;
+
+      // Measure popup canvas column width for responsive sizing
+      var col = canvasEl.closest('.ikc-canvas-col');
+      var colWidth = col ? col.clientWidth : 0;
+      var sz = Math.min(CANVAS_SZ, colWidth > 40 ? colWidth - 8 : CANVAS_SZ);
+      sz = Math.max(sz, 220);
+
+      canvasEl.width  = sz;
+      canvasEl.height = sz;
+
+      var fc = new fabric.Canvas(canvasEl, {
+        backgroundColor: '#f8f9fa',
+        preserveObjectStacking: true,
+        width: sz,
+        height: sz,
+      });
+
+      if (fc.wrapperEl) {
+        fc.wrapperEl.style.width  = sz + 'px';
+        fc.wrapperEl.style.height = sz + 'px';
+      }
+
+      state.fc = fc;
+      state.canvasSz = sz;
+
+      // Hint text
+      state.hintObj = new fabric.Text('Add text or image to preview', {
+        left: sz / 2, top: sz / 2,
+        originX: 'center', originY: 'center',
+        fontSize: Math.max(13, Math.round(sz * 0.033)),
+        fontFamily: 'sans-serif', fill: '#c4c9d4',
+        selectable: false, evented: false,
+      });
+      fc.add(state.hintObj);
+      fc.renderAll();
+
+      if (SHOW_FONTS)  setupFonts(fc, state, blockId, APP_URL, SHOP);
+      setupText(fc, state, blockId);
+      setupColorPicker(fc, state, blockId);
+      if (SHOW_UPLOAD) setupImageUpload(fc, state, blockId);
+
+      if (saveBtn) {
+        saveBtn.addEventListener('click', function () {
+          handleSave(fc, state, blockId);
+        });
+      }
+
+      setupCartInterception(fc, state, blockId, APP_URL, SHOP);
+    }
+
+    // ── Save handler ─────────────────────────────────────────────────────
+    function handleSave(fc, state, blockId) {
+      var textInput = document.getElementById('ikc-text-input-' + blockId);
       var hasText   = textInput && textInput.value.trim().length > 0;
       var hasImage  = Boolean(state.rawFile);
 
-      // If nothing was customized, let normal cart submission proceed
-      if (!hasText && !hasImage) return;
-
-      e.preventDefault();
-
-      var submitBtn = form.querySelector('[type="submit"]');
-      var origLabel = submitBtn ? submitBtn.textContent : '';
-      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Processing…'; }
-
-      // Export canvas at 3× DPI for print quality (1500×1500 for a 500px canvas)
-      var dataUrl = fc.toDataURL({ format: 'png', multiplier: 3 });
-
-      // Upload canvas design PNG
-      var designUpload = fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dataUrl: dataUrl }),
-      }).then(function (r) {
-        if (!r.ok) throw new Error('Design upload error: ' + r.status);
-        return r.json();
-      });
-
-      // Upload raw customer image file (only if they uploaded one)
-      var rawUpload = state.rawFile
-        ? (function () {
-            var fd = new FormData();
-            fd.append('file', state.rawFile);
-            return fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
-              method: 'POST',
-              body: fd,
-            }).then(function (r) {
-              if (!r.ok) throw new Error('Raw upload error: ' + r.status);
-              return r.json();
-            });
-          })()
-        : Promise.resolve({ url: '' });
-
-      Promise.all([designUpload, rawUpload])
-        .then(function (results) {
-          var designData = results[0];
-          var rawData    = results[1];
-
-          // Revoke blob URL — we now have permanent Firebase URLs
-          if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
-
-          var props = {
-            '_custom_text':       (textInput && textInput.value.trim()) || '',
-            '_custom_font':       state.fontName || '',
-            '_raw_image_url':     rawData.url || '',
-            '_design_image_url':  designData.url || '',
-          };
-
-          injectLineItemProps(form, props);
-          form.submit();
-        })
-        .catch(function (err) {
-          console.error('[InkCanvas] Cart upload failed:', err);
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origLabel || 'Add to cart'; }
-          showWidgetError(root, 'Failed to save your design. Please try again.');
-        });
-    });
-  }
-
-  function findProductForm(root) {
-    // Walk up the DOM looking for a Shopify product form
-    var el = root;
-    while (el && el !== document.body) {
-      el = el.parentElement;
-      if (el && el.matches('form[action*="/cart/add"]')) return el;
-    }
-    return document.querySelector('form[action*="/cart/add"]');
-  }
-
-  function injectLineItemProps(form, props) {
-    for (var key in props) {
-      if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
-      var val = props[key];
-      if (!val) continue;
-      var name  = 'properties[' + key + ']';
-      var input = form.querySelector('input[name="' + name + '"]');
-      if (!input) {
-        input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = name;
-        form.appendChild(input);
+      if (!hasText && !hasImage) {
+        showError('Please add some text or upload an image first.');
+        return;
       }
-      input.value = val;
-    }
-  }
+      clearError();
 
-  // ── Utilities ───────────────────────────────────────────────────────────
+      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+
+      state.savedDataUrl = fc.toDataURL({ format: 'png', multiplier: 3 });
+
+      var previewSize = computePreviewSize(state.selectedVariantTitle);
+
+      if (previewImg) {
+        previewImg.src = state.savedDataUrl;
+        previewImg.style.width  = previewSize + 'px';
+        previewImg.style.height = previewSize + 'px';
+      }
+
+      if (previewArea) previewArea.style.display = '';
+
+      closeModal();
+      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Design'; }
+    }
+
+    // ── Preview size computation ──────────────────────────────────────────
+    function computePreviewSize(variantTitle) {
+      var parsed = parseInches(variantTitle);
+      if (!parsed) return 160;
+
+      var maxInches = parsed;
+      if (popupVariantSel) {
+        for (var i = 0; i < popupVariantSel.options.length; i++) {
+          var title = popupVariantSel.options[i].getAttribute('data-title') || popupVariantSel.options[i].text;
+          var v = parseInches(title);
+          if (v && v > maxInches) maxInches = v;
+        }
+      }
+
+      return Math.round((parsed / maxInches) * MAX_PREVIEW_PX);
+    }
+
+    function parseInches(str) {
+      if (!str) return null;
+      var m = str.match(/(\d+(?:\.\d+)?)\s*(?:inch(?:es)?|in\b|")/i);
+      if (m) return parseFloat(m[1]);
+      var n = str.match(/^(\d+(?:\.\d+)?)/);
+      return n ? parseFloat(n[1]) : null;
+    }
+
+    function showError(msg) {
+      if (errorMsg) { errorMsg.textContent = msg; errorMsg.style.display = ''; }
+    }
+    function clearError() {
+      if (errorMsg) { errorMsg.textContent = ''; errorMsg.style.display = 'none'; }
+    }
+
+    // ── Font manager ──────────────────────────────────────────────────────
+    function setupFonts(fc, state, blockId, APP_URL, SHOP) {
+      var select = document.getElementById('ikc-font-select-' + blockId);
+      if (!select) return;
+
+      var fontsPromise;
+      if (state.remoteFonts && state.remoteFonts.length > 0) {
+        fontsPromise = Promise.resolve(state.remoteFonts);
+      } else {
+        fontsPromise = fetch(APP_URL + '/api/fonts?shop=' + encodeURIComponent(SHOP))
+          .then(function (r) { return r.json(); });
+      }
+
+      fontsPromise
+        .then(function (fonts) {
+          if (!Array.isArray(fonts) || fonts.length === 0) {
+            select.innerHTML = '<option value="">No fonts configured</option>';
+            return;
+          }
+          select.innerHTML = fonts.map(function (f) {
+            return '<option value="' + escAttr(f.url) + '" data-name="' + escAttr(f.name) + '">' + escHtml(f.name) + '</option>';
+          }).join('');
+
+          var first = fonts[0];
+          loadAndApplyFont(fc, state, first.url, first.name);
+
+          select.addEventListener('change', function () {
+            var opt = select.options[select.selectedIndex];
+            if (opt && opt.value) loadAndApplyFont(fc, state, opt.value, opt.dataset.name || opt.text);
+          });
+        })
+        .catch(function () {
+          select.innerHTML = '<option value="">Default font</option>';
+        });
+    }
+
+    function loadAndApplyFont(fc, state, url, name) {
+      var safeName = 'ikc-' + name.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+      if (!document.getElementById('ikc-ff-' + safeName)) {
+        var style = document.createElement('style');
+        style.id  = 'ikc-ff-' + safeName;
+        style.textContent = '@font-face { font-family: "' + safeName + '"; src: url("' + url + '"); font-display: swap; }';
+        document.head.appendChild(style);
+      }
+      if (typeof FontFace !== 'undefined') {
+        new FontFace(safeName, 'url(' + url + ')')
+          .load()
+          .then(function (loaded) {
+            document.fonts.add(loaded);
+            applyFontToCanvas(fc, state, safeName, name);
+          })
+          .catch(function () {
+            setTimeout(function () { applyFontToCanvas(fc, state, safeName, name); }, 600);
+          });
+      } else {
+        setTimeout(function () { applyFontToCanvas(fc, state, safeName, name); }, 600);
+      }
+    }
+
+    function applyFontToCanvas(fc, state, safeName, displayName) {
+      state.fontFamily = safeName;
+      state.fontName   = displayName;
+      if (state.textObj) { state.textObj.set('fontFamily', safeName); fc.renderAll(); }
+    }
+
+    // ── Text layer ────────────────────────────────────────────────────────
+    function setupText(fc, state, blockId) {
+      var input = document.getElementById('ikc-text-input-' + blockId);
+      if (!input) return;
+      var sz = state.canvasSz;
+
+      input.addEventListener('input', function () {
+        var val = input.value;
+        if (!state.textObj) {
+          if (!val) return;
+          if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
+          state.textObj = new fabric.Text(val, {
+            left: sz / 2, top: Math.round(sz * 0.78),
+            originX: 'center', originY: 'center',
+            fontSize: Math.round(sz * 0.075),
+            fontFamily: state.fontFamily, fill: state.textColor, textAlign: 'center',
+          });
+          fc.add(state.textObj);
+          fc.setActiveObject(state.textObj);
+        } else {
+          state.textObj.set({ text: val, fontFamily: state.fontFamily });
+        }
+        fc.renderAll();
+      });
+    }
+
+    // ── Color picker ──────────────────────────────────────────────────────
+    function setupColorPicker(fc, state, blockId) {
+      var picker   = document.getElementById('ikc-color-input-' + blockId);
+      var hexLabel = document.getElementById('ikc-color-hex-' + blockId);
+      if (!picker) return;
+
+      picker.addEventListener('input', function () {
+        var color = picker.value;
+        state.textColor = color;
+        if (hexLabel) hexLabel.textContent = color;
+        if (state.textObj) { state.textObj.set({ fill: color }); fc.renderAll(); }
+      });
+    }
+
+    // ── Image upload ──────────────────────────────────────────────────────
+    function setupImageUpload(fc, state, blockId) {
+      var input     = document.getElementById('ikc-img-input-' + blockId);
+      var labelSpan = document.getElementById('ikc-upload-label-' + blockId);
+      if (!input) return;
+
+      input.addEventListener('change', function () {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        if (file.size > 20 * 1024 * 1024) { showError('Image must be smaller than 20 MB.'); return; }
+        clearError();
+        if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
+        state.rawFile = file;
+        state.blobUrl = URL.createObjectURL(file);
+        placeImageOnCanvas(fc, state, state.blobUrl, file.name, labelSpan);
+      });
+    }
+
+    function placeImageOnCanvas(fc, state, url, fileName, labelSpan) {
+      var sz = state.canvasSz;
+      fabric.Image.fromURL(url, { crossOrigin: 'anonymous' })
+        .then(function (img) {
+          if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
+          if (state.imageObj) fc.remove(state.imageObj);
+          var maxDim = sz * 0.85;
+          var scale  = Math.min(maxDim / (img.width || 1), maxDim / (img.height || 1));
+          img.set({ left: sz / 2, top: sz / 2, originX: 'center', originY: 'center', scaleX: scale, scaleY: scale });
+          state.imageObj = img;
+          fc.add(img);
+          if (state.textObj) fc.bringObjectToFront(state.textObj);
+          fc.renderAll();
+          if (labelSpan) labelSpan.textContent = fileName;
+        })
+        .catch(function () { showError('Failed to display image. Please try again.'); });
+    }
+
+    // ── Cart intercept ────────────────────────────────────────────────────
+    function setupCartInterception(fc, state, blockId, APP_URL, SHOP) {
+      var form = findProductForm(root);
+      if (!form) return;
+
+      form.addEventListener('submit', function (e) {
+        if (!state.savedDataUrl) return;
+
+        e.preventDefault();
+        var submitBtn = form.querySelector('[type="submit"]');
+        var origLabel = submitBtn ? submitBtn.textContent : '';
+        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Processing…'; }
+
+        var dataUrl = state.savedDataUrl;
+
+        var designUpload = fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl: dataUrl }),
+        }).then(function (r) {
+          if (!r.ok) throw new Error('Design upload error: ' + r.status);
+          return r.json();
+        });
+
+        var rawUpload = state.rawFile
+          ? (function () {
+              var fd = new FormData();
+              fd.append('file', state.rawFile);
+              return fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
+                method: 'POST', body: fd,
+              }).then(function (r) {
+                if (!r.ok) throw new Error('Raw upload error: ' + r.status);
+                return r.json();
+              });
+            })()
+          : Promise.resolve({ url: '' });
+
+        Promise.all([designUpload, rawUpload])
+          .then(function (results) {
+            var designData = results[0];
+            var rawData    = results[1];
+            if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
+
+            var textInput = document.getElementById('ikc-text-input-' + blockId);
+            var props = {
+              '_custom_text':      (textInput && textInput.value.trim()) || '',
+              '_custom_font':      state.fontName || '',
+              '_raw_image_url':    rawData.url || '',
+              '_design_image_url': designData.url || '',
+              '_variant_title':    state.selectedVariantTitle || '',
+              '_print_size':       state.selectedVariantTitle || '',
+            };
+
+            injectLineItemProps(form, props);
+            form.submit();
+          })
+          .catch(function (err) {
+            console.error('[InkCanvas] Cart upload failed:', err);
+            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origLabel || 'Add to cart'; }
+            showError('Failed to save your design. Please try again.');
+          });
+      });
+    }
+
+    function findProductForm(root) {
+      var el = root;
+      while (el && el !== document.body) {
+        el = el.parentElement;
+        if (el && el.matches('form[action*="/cart/add"]')) return el;
+      }
+      return document.querySelector('form[action*="/cart/add"]');
+    }
+
+    function injectLineItemProps(form, props) {
+      for (var key in props) {
+        if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
+        var val = props[key];
+        if (!val) continue;
+        var name  = 'properties[' + key + ']';
+        var input = form.querySelector('input[name="' + name + '"]');
+        if (!input) {
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          form.appendChild(input);
+        }
+        input.value = val;
+      }
+    }
+  } // end initBlock
+
+  // ── Utilities ─────────────────────────────────────────────────────────
   function escAttr(str) { return String(str).replace(/"/g, '&quot;'); }
   function escHtml(str) {
     return String(str)
