@@ -12,6 +12,7 @@ export interface OrderCustomization {
   rawImageUrl: string;
   designImageUrl: string;
   canvasJson: string;
+  printSize: string;
 }
 
 export interface Order {

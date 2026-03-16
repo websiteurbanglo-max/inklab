@@ -33,6 +33,7 @@ const CUSTOMIZATION_PROPERTIES = new Set([
   "_raw_image_url",
   "_design_image_url",
   "_canvas_json",
+  "_print_size",
 ]);
 
 function getProperty(properties: LineItemProperty[], name: string): string {
@@ -76,6 +77,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       rawImageUrl: getProperty(props, "_raw_image_url"),
       designImageUrl: getProperty(props, "_design_image_url"),
       canvasJson: getProperty(props, "_canvas_json"),
+      printSize: getProperty(props, "_print_size"),
     });
   }
 
