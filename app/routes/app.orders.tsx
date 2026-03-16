@@ -71,7 +71,7 @@ export default function OrdersPage() {
               <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 760 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid #e1e3e5" }}>
-                    {["Order", "Date", "Customer", "Product", "Customization", "Preview", "Downloads"].map((h) => (
+                    {["Order", "Date", "Customer", "Product", "Print Size", "Customization", "Preview", "Downloads"].map((h) => (
                       <th
                         key={h}
                         style={{
@@ -119,6 +119,15 @@ export default function OrdersPage() {
                               <Text as="p" tone="subdued">{c.variantTitle}</Text>
                             )}
                           </BlockStack>
+                        </td>
+                        <td style={{ padding: "0.75rem 1rem", whiteSpace: "nowrap" }}>
+                          {c.printSize ? (
+                            <Badge>{c.printSize}</Badge>
+                          ) : c.variantTitle ? (
+                            <Text as="span" tone="subdued">{c.variantTitle}</Text>
+                          ) : (
+                            <Text as="span" tone="subdued">—</Text>
+                          )}
                         </td>
                         <td style={{ padding: "0.75rem 1rem" }}>
                           <BlockStack gap="0">
