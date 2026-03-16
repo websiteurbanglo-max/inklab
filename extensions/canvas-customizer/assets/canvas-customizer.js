@@ -518,7 +518,7 @@
       for (var key in props) {
         if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
         var val = props[key];
-        if (!val) continue;
+        if (val === null || val === undefined) continue;
         var name  = 'properties[' + key + ']';
         var input = form.querySelector('input[name="' + name + '"]');
         if (!input) {
