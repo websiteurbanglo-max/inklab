@@ -12,7 +12,7 @@ export interface OrderCustomization {
   rawImageUrl: string;
   designImageUrl: string;
   canvasJson: string;
-  printSize: string;
+  printSize?: string;  // absent on orders created before this field was added
 }
 
 export interface Order {

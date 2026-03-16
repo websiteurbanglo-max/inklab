@@ -24,7 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // Shopify also passes ?shop= in every app proxy request as a reliable fallback.
     shop = result.session?.shop ?? new URL(request.url).searchParams.get("shop") ?? "";
   } catch {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return Response.json({ error: "Unauthorized" }, { status: 401, headers: corsHeaders() });
   }
 
   if (!shop) {
