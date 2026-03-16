@@ -34,5 +34,10 @@ redirect_urls = [
   "https://inklab-production.up.railway.app/auth/shopify/callback"
  ]
 
+[app_proxy]
+url = "https://inklab-production.up.railway.app/apps/inkcanvas"
+subpath = "inkcanvas"
+prefix = "apps"
+
 [build]
 automatically_update_urls_on_dev = true
