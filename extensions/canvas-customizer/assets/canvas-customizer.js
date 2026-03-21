@@ -6,8 +6,6 @@
 (function () {
   'use strict';
 
-  var MAX_PREVIEW_PX = 200; // max preview thumbnail size in px (for largest variant)
-
   // ── Boot: wait for DOM, then init each block ──────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootAll);
@@ -19,12 +17,30 @@
     var configs = window.InkCanvasConfig;
     if (!configs || typeof configs !== 'object') return;
 
+    setupViewportHeightVar();
+
     Object.keys(configs).forEach(function (blockId) {
       var cfg = configs[blockId];
       if (cfg && cfg.blockId) {
         initBlock(cfg);
       }
     });
+  }
+
+  function setupViewportHeightVar() {
+    var root = document.documentElement;
+    function apply() {
+      var h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+      if (!h) return;
+      root.style.setProperty('--ikc-vh', (h * 0.01) + 'px');
+    }
+    apply();
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', apply);
+      window.visualViewport.addEventListener('scroll', apply);
+    } else {
+      window.addEventListener('resize', apply);
+    }
   }
 
   // ── Per-block init ────────────────────────────────────────────────────────
@@ -46,14 +62,23 @@
     var modal       = document.getElementById('ikc-modal-' + blockId);
     var closeBtn    = document.getElementById('ikc-close-btn-' + blockId);
     var cancelBtn   = document.getElementById('ikc-cancel-btn-' + blockId);
-    var saveBtn     = document.getElementById('ikc-save-btn-' + blockId);
+    var addToCartBtn = document.getElementById('ikc-add-to-cart-btn-' + blockId);
     var editBtn     = document.getElementById('ikc-edit-btn-' + blockId);
-    var previewArea = document.getElementById('ikc-preview-' + blockId);
-    var previewImg  = document.getElementById('ikc-preview-img-' + blockId);
     var errorMsg    = document.getElementById('ikc-modal-error-' + blockId);
     var popupVariantSel = document.getElementById('ikc-variant-select-' + blockId);
+    var canvasFrame = document.querySelector('#ikc-modal-' + blockId + ' .ikc-canvas-frame');
 
     if (!openBtn || !modal) return;
+
+    // Ensure modal overlay is mounted at <body> level.
+    // Some themes apply transforms to page wrappers on mobile; fixed-position children inside
+    // transformed ancestors may not overlay sticky/fixed UI reliably.
+    if (modal.parentElement !== document.body) {
+      document.body.appendChild(modal);
+    }
+
+    // Hide native purchase buttons on the product page (InkCanvas-enabled products only)
+    hideNativePurchaseButtons(root);
 
     // Per-block state
     var state = {
@@ -158,20 +183,29 @@
 
       if (!state.fc) {
         if (window.fabric) {
-          initCanvas();
+          // Defer Fabric init until after layout/paint so frame measurements
+          // aren't temporarily near-zero.
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () { initCanvas(); });
+          });
         } else {
           var attempts = 0;
           var poll = setInterval(function () {
             attempts++;
             if (window.fabric) {
               clearInterval(poll);
-              initCanvas();
+              requestAnimationFrame(function () {
+                requestAnimationFrame(function () { initCanvas(); });
+              });
             } else if (attempts > 50) {
               clearInterval(poll);
               showError('Canvas engine failed to load. Please refresh.');
             }
           }, 100);
         }
+      } else {
+        // Ensure canvas fits after reopen/orientation changes
+        scheduleResize();
       }
     }
 
@@ -189,11 +223,7 @@
       var canvasEl = document.getElementById('ikc-canvas-' + blockId);
       if (!canvasEl) return;
 
-      // Measure popup canvas column width for responsive sizing
-      var col = canvasEl.closest('.ikc-canvas-col');
-      var colWidth = col ? col.clientWidth : 0;
-      var sz = Math.min(CANVAS_SZ, colWidth > 40 ? colWidth - 8 : CANVAS_SZ);
-      sz = Math.max(sz, 220);
+      var sz = computeCanvasSize();
 
       canvasEl.width  = sz;
       canvasEl.height = sz;
@@ -226,20 +256,18 @@
 
       if (SHOW_FONTS)  setupFonts(fc, state, blockId, APP_URL, SHOP);
       setupText(fc, state, blockId);
-      setupColorPicker(fc, state, blockId);
       if (SHOW_UPLOAD) setupImageUpload(fc, state, blockId);
 
-      if (saveBtn) {
-        saveBtn.addEventListener('click', function () {
-          handleSave(fc, state, blockId);
-        });
-      }
-
-      setupCartInterception(fc, state, blockId, APP_URL, SHOP);
+      setupCanvasResizeHandling();
     }
 
-    // ── Save handler ─────────────────────────────────────────────────────
-    function handleSave(fc, state, blockId) {
+    if (addToCartBtn) {
+      addToCartBtn.addEventListener('click', function () {
+        handleAddToCart(state, blockId);
+      });
+    }
+
+    function handleAddToCart(state, blockId) {
       var textInput = document.getElementById('ikc-text-input-' + blockId);
       var hasText   = textInput && textInput.value.trim().length > 0;
       var hasImage  = Boolean(state.rawFile);
@@ -250,47 +278,79 @@
       }
       clearError();
 
-      if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
-
-      state.savedDataUrl = fc.toDataURL({ format: 'png', multiplier: 3 });
-
-      var previewSize = computePreviewSize(state.selectedVariantTitle);
-
-      if (previewImg) {
-        previewImg.src = state.savedDataUrl;
-        previewImg.style.width  = previewSize + 'px';
-        previewImg.style.height = previewSize + 'px';
+      if (state.fc) {
+        state.savedDataUrl = state.fc.toDataURL({ format: 'png', multiplier: 3 });
       }
 
-      if (previewArea) previewArea.style.display = '';
+      var origLabel = addToCartBtn.textContent;
+      addToCartBtn.disabled = true;
+      addToCartBtn.textContent = 'Processing…';
 
-      closeModal();
-      if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save Design'; }
-    }
+      // Upload design + raw image, then add to cart via Ajax API
+      var dataUrl = state.savedDataUrl;
 
-    // ── Preview size computation ──────────────────────────────────────────
-    function computePreviewSize(variantTitle) {
-      var parsed = parseInches(variantTitle);
-      if (!parsed) return 160;
+      var designUpload = fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl: dataUrl }),
+      }).then(function (r) {
+        if (!r.ok) throw new Error('Design upload error: ' + r.status);
+        return r.json();
+      });
 
-      var maxInches = parsed;
-      if (popupVariantSel) {
-        for (var i = 0; i < popupVariantSel.options.length; i++) {
-          var title = popupVariantSel.options[i].getAttribute('data-title') || popupVariantSel.options[i].text;
-          var v = parseInches(title);
-          if (v && v > maxInches) maxInches = v;
-        }
-      }
+      var rawUpload = state.rawFile
+        ? (function () {
+            var fd = new FormData();
+            fd.append('file', state.rawFile);
+            return fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
+              method: 'POST', body: fd,
+            }).then(function (r) {
+              if (!r.ok) throw new Error('Raw upload error: ' + r.status);
+              return r.json();
+            });
+          })()
+        : Promise.resolve({ url: '' });
 
-      return Math.round((parsed / maxInches) * MAX_PREVIEW_PX);
-    }
+      Promise.all([designUpload, rawUpload])
+        .then(function (results) {
+          var designData = results[0];
+          var rawData    = results[1];
+          if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
 
-    function parseInches(str) {
-      if (!str) return null;
-      var m = str.match(/(\d+(?:\.\d+)?)\s*(?:inch(?:es)?|in\b|")/i);
-      if (m) return parseFloat(m[1]);
-      var n = str.match(/^(\d+(?:\.\d+)?)/);
-      return n ? parseFloat(n[1]) : null;
+          var properties = {
+            '_custom_text':      (textInput && textInput.value.trim()) || '',
+            '_custom_font':      state.fontName || '',
+            '_raw_image_url':    rawData.url || '',
+            '_design_image_url': designData.url || '',
+            '_variant_title':    state.selectedVariantTitle || '',
+            '_print_size':       state.selectedVariantTitle || '',
+          };
+
+          // Use Shopify Ajax Cart API for full control over post-add behavior
+          return fetch('/cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: parseInt(state.selectedVariantId, 10),
+              quantity: 1,
+              properties: properties,
+            }),
+          });
+        })
+        .then(function (r) {
+          if (!r.ok) throw new Error('Cart add error: ' + r.status);
+          return r.json();
+        })
+        .then(function () {
+          // Redirect to cart page
+          window.location.href = '/cart';
+        })
+        .catch(function (err) {
+          console.error('[InkCanvas] Add to cart failed:', err);
+          addToCartBtn.disabled = false;
+          addToCartBtn.textContent = origLabel || 'Add to cart';
+          showError('Failed to add to cart. Please try again.');
+        });
     }
 
     function showError(msg) {
@@ -369,10 +429,10 @@
     function setupText(fc, state, blockId) {
       var input = document.getElementById('ikc-text-input-' + blockId);
       if (!input) return;
-      var sz = state.canvasSz;
 
       input.addEventListener('input', function () {
         var val = input.value;
+        var sz = state.canvasSz;
         if (!state.textObj) {
           if (!val) return;
           if (state.hintObj) { fc.remove(state.hintObj); state.hintObj = null; }
@@ -388,20 +448,6 @@
           state.textObj.set({ text: val, fontFamily: state.fontFamily });
         }
         fc.renderAll();
-      });
-    }
-
-    // ── Color picker ──────────────────────────────────────────────────────
-    function setupColorPicker(fc, state, blockId) {
-      var picker   = document.getElementById('ikc-color-input-' + blockId);
-      var hexLabel = document.getElementById('ikc-color-hex-' + blockId);
-      if (!picker) return;
-
-      picker.addEventListener('input', function () {
-        var color = picker.value;
-        state.textColor = color;
-        if (hexLabel) hexLabel.textContent = color;
-        if (state.textObj) { state.textObj.set({ fill: color }); fc.renderAll(); }
       });
     }
 
@@ -441,68 +487,90 @@
         .catch(function () { showError('Failed to display image. Please try again.'); });
     }
 
-    // ── Cart intercept ────────────────────────────────────────────────────
-    function setupCartInterception(fc, state, blockId, APP_URL, SHOP) {
-      var form = findProductForm(root);
-      if (!form) return;
+    function computeCanvasSize() {
+      var frame = canvasFrame || document.querySelector('#ikc-modal-' + blockId + ' .ikc-canvas-frame');
+      if (!frame) {
+        return Math.min(CANVAS_SZ, 420);
+      }
 
-      form.addEventListener('submit', function (e) {
-        if (!state.savedDataUrl) return;
+      var isMobile = window.matchMedia && window.matchMedia('(max-width: 600px)').matches;
+      if (isMobile) {
+        // Mobile: make it extremely simple and stable.
+        // We want the canvas to match the remaining vertical space in the frame.
+        var h = Math.floor(frame.clientHeight || 0);
+        if (!Number.isFinite(h) || h <= 0) {
+          h = Math.floor(frame.getBoundingClientRect().height || 0);
+        }
 
-        e.preventDefault();
-        var submitBtn = form.querySelector('[type="submit"]');
-        var origLabel = submitBtn ? submitBtn.textContent : '';
-        if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Processing…'; }
+        // During open/resize, measurements can temporarily be tiny; fall back to last good size.
+        if (state.canvasSz && h < 20) h = Math.min(state.canvasSz, CANVAS_SZ);
 
-        var dataUrl = state.savedDataUrl;
+        h = Math.min(h, CANVAS_SZ);
+        return Math.max(1, h);
+      }
 
-        var designUpload = fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dataUrl: dataUrl }),
-        }).then(function (r) {
-          if (!r.ok) throw new Error('Design upload error: ' + r.status);
-          return r.json();
-        });
+      // Desktop/tablet: keep the existing measurement-based sizing.
+      var padding = 10;
+      var rect = frame.getBoundingClientRect();
+      var maxFit = Math.floor(Math.min(rect.width, rect.height) - padding);
+      if (!Number.isFinite(maxFit) || maxFit < 0) maxFit = 0;
 
-        var rawUpload = state.rawFile
-          ? (function () {
-              var fd = new FormData();
-              fd.append('file', state.rawFile);
-              return fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
-                method: 'POST', body: fd,
-              }).then(function (r) {
-                if (!r.ok) throw new Error('Raw upload error: ' + r.status);
-                return r.json();
-              });
-            })()
-          : Promise.resolve({ url: '' });
+      var sz = Math.min(maxFit, CANVAS_SZ);
+      return Math.max(1, sz);
+    }
 
-        Promise.all([designUpload, rawUpload])
-          .then(function (results) {
-            var designData = results[0];
-            var rawData    = results[1];
-            if (state.blobUrl) URL.revokeObjectURL(state.blobUrl);
-
-            var textInput = document.getElementById('ikc-text-input-' + blockId);
-            var props = {
-              '_custom_text':      (textInput && textInput.value.trim()) || '',
-              '_custom_font':      state.fontName || '',
-              '_raw_image_url':    rawData.url || '',
-              '_design_image_url': designData.url || '',
-              '_variant_title':    state.selectedVariantTitle || '',
-              '_print_size':       state.selectedVariantTitle || '',
-            };
-
-            injectLineItemProps(form, props);
-            form.submit();
-          })
-          .catch(function (err) {
-            console.error('[InkCanvas] Cart upload failed:', err);
-            if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = origLabel || 'Add to cart'; }
-            showError('Failed to save your design. Please try again.');
-          });
+    function scheduleResize() {
+      if (scheduleResize._t) cancelAnimationFrame(scheduleResize._t);
+      scheduleResize._t = requestAnimationFrame(function () {
+        resizeCanvasIfNeeded();
       });
+    }
+
+    function resizeCanvasIfNeeded() {
+      if (!state.fc) return;
+      var newSz = computeCanvasSize();
+      var oldSz = state.canvasSz || newSz;
+      if (!newSz || Math.abs(newSz - oldSz) < 2) return;
+
+      var scale = newSz / oldSz;
+
+      var canvasEl = document.getElementById('ikc-canvas-' + blockId);
+      if (!canvasEl) return;
+
+      canvasEl.width = newSz;
+      canvasEl.height = newSz;
+
+      state.fc.setWidth(newSz);
+      state.fc.setHeight(newSz);
+      state.fc.setDimensions({ width: newSz, height: newSz }, { cssOnly: false });
+
+      if (state.fc.wrapperEl) {
+        state.fc.wrapperEl.style.width = newSz + 'px';
+        state.fc.wrapperEl.style.height = newSz + 'px';
+      }
+
+      state.fc.getObjects().forEach(function (obj) {
+        obj.scaleX = (obj.scaleX || 1) * scale;
+        obj.scaleY = (obj.scaleY || 1) * scale;
+        obj.left = (obj.left || 0) * scale;
+        obj.top = (obj.top || 0) * scale;
+        obj.setCoords();
+      });
+
+      state.canvasSz = newSz;
+      state.fc.renderAll();
+    }
+
+    function setupCanvasResizeHandling() {
+      var frame = canvasFrame || document.querySelector('#ikc-modal-' + blockId + ' .ikc-canvas-frame');
+      if (!frame) return;
+
+      if (typeof ResizeObserver !== 'undefined') {
+        var ro = new ResizeObserver(function () { scheduleResize(); });
+        ro.observe(frame);
+      } else {
+        window.addEventListener('resize', function () { scheduleResize(); });
+      }
     }
 
     function findProductForm(root) {
@@ -514,21 +582,31 @@
       return document.querySelector('form[action*="/cart/add"]');
     }
 
-    function injectLineItemProps(form, props) {
-      for (var key in props) {
-        if (!Object.prototype.hasOwnProperty.call(props, key)) continue;
-        var val = props[key];
-        if (val === null || val === undefined) continue;
-        var name  = 'properties[' + key + ']';
-        var input = form.querySelector('input[name="' + name + '"]');
-        if (!input) {
-          input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = name;
-          form.appendChild(input);
-        }
-        input.value = val;
+    function hideNativePurchaseButtons(root) {
+      var form = findProductForm(root);
+      if (!form) return;
+
+      var elementsToHide = [];
+
+      // Main add-to-cart buttons (varies by theme)
+      elementsToHide = elementsToHide.concat(Array.prototype.slice.call(
+        form.querySelectorAll('button[type="submit"], input[type="submit"], button[name="add"]')
+      ));
+
+      // Dynamic checkout (Shop Pay / accelerated checkouts) container
+      var payButtons = [];
+      payButtons = payButtons.concat(Array.prototype.slice.call(form.querySelectorAll('.shopify-payment-button')));
+      if (form.parentElement) {
+        payButtons = payButtons.concat(Array.prototype.slice.call(form.parentElement.querySelectorAll('.shopify-payment-button')));
       }
+      elementsToHide = elementsToHide.concat(payButtons);
+
+      elementsToHide.forEach(function (el) {
+        if (!el || el.dataset.ikcHidden === 'true') return;
+        el.dataset.ikcPrevDisplay = el.style.display || '';
+        el.style.display = 'none';
+        el.dataset.ikcHidden = 'true';
+      });
     }
   } // end initBlock
 

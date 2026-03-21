@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { createOrder } from "../models/order.server";
+import { createOrder, syncToDashboards } from "../models/order.server";
 import type { OrderCustomization } from "../models/order.server";
 
 interface LineItemProperty {
@@ -109,6 +109,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log(
       `[webhook:orders/create] Saved order #${order.order_number} for ${shop} (${customizations.length} customized item(s))`
     );
+
+    // Sync to dashboard Firestore collections (shop-dashboard + superadmin)
+    try {
+      await syncToDashboards({
+        shopDomain: shop,
+        shopifyOrderId: String(order.id),
+        shopifyOrderNumber: order.order_number,
+        customerName,
+        customerEmail,
+        totalPrice: order.total_price,
+        currency: order.currency,
+        customizations,
+      });
+    } catch (syncErr) {
+      // Log but don't fail the webhook — the order is already saved in the orders collection
+      console.error(
+        `[webhook:orders/create] Dashboard sync FAILED for order #${order.order_number}:`,
+        syncErr
+      );
+    }
   } catch (err: unknown) {
     // Log full error details — still return 200 to stop Shopify retrying forever
     const code = (err as { code?: string })?.code;

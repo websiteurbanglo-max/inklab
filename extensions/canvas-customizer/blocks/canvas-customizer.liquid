@@ -16,6 +16,22 @@
 
 {%- if is_enabled -%}
 
+{%- comment -%}
+  Hide native purchase buttons immediately via CSS — no 1-second flash.
+  These selectors target the product form's submit buttons and Shopify's
+  accelerated checkout (Shop Pay / Buy Now) container.
+{%- endcomment -%}
+<style>
+  form[action*="/cart/add"] button[type="submit"],
+  form[action*="/cart/add"] input[type="submit"],
+  form[action*="/cart/add"] button[name="add"],
+  form[action*="/cart/add"] .shopify-payment-button,
+  form[action*="/cart/add"] + .shopify-payment-button,
+  form[action*="/cart/add"] ~ .shopify-payment-button {
+    display: none !important;
+  }
+</style>
+
 <div
   id="inkcanvas-root-{{ block.id }}"
   class="inkcanvas-root"
@@ -37,7 +53,15 @@
   {%- comment -%} Preview area — shown after user saves design {%- endcomment -%}
   <div id="ikc-preview-{{ block.id }}" class="ikc-preview-area" style="display:none">
     <p class="ikc-preview-label">Your design preview:</p>
-    <img id="ikc-preview-img-{{ block.id }}" class="ikc-preview-img" src="" alt="Your custom design" />
+    <img
+      id="ikc-preview-img-{{ block.id }}"
+      class="ikc-preview-img"
+      src="{{ 'preview-placeholder.svg' | asset_url }}"
+      width="160"
+      height="160"
+      decoding="async"
+      alt="Your custom design"
+    />
     <button id="ikc-edit-btn-{{ block.id }}" class="ikc-edit-btn" type="button">Edit design</button>
   </div>
 
@@ -52,54 +76,42 @@
       </div>
 
       <div class="ikc-modal-body">
-        {%- comment -%} Variant selector inside popup {%- endcomment -%}
-        <div class="ikc-group" id="ikc-variant-group-{{ block.id }}">
-          <label class="ikc-label" for="ikc-variant-select-{{ block.id }}">Select size / variant</label>
-          <select id="ikc-variant-select-{{ block.id }}" class="ikc-select">
-            {%- for variant in product.variants -%}
-              <option value="{{ variant.id }}" data-title="{{ variant.title | escape }}">
-                {{ variant.title }}
-              </option>
-            {%- endfor -%}
-          </select>
-        </div>
-
-        <p id="ikc-modal-error-{{ block.id }}" class="ikc-error-msg" style="display:none"></p>
-
-        <div class="ikc-editor-wrap">
-          {%- comment -%} Canvas column {%- endcomment -%}
-          <div class="ikc-canvas-col">
-            <canvas id="ikc-canvas-{{ block.id }}"></canvas>
-          </div>
-
-          {%- comment -%} Controls column {%- endcomment -%}
-          <div class="ikc-controls-col">
-            <div class="ikc-group">
-              <label class="ikc-label" for="ikc-text-input-{{ block.id }}">Your text</label>
-              <input id="ikc-text-input-{{ block.id }}" class="ikc-input" type="text"
-                placeholder="{{ placeholder | escape }}" maxlength="80" />
-            </div>
-
-            <div class="ikc-group">
-              <label class="ikc-label" for="ikc-color-input-{{ block.id }}">Text color</label>
-              <div class="ikc-color-row">
-                <input id="ikc-color-input-{{ block.id }}" class="ikc-color-swatch" type="color" value="#1a1a1a" />
-                <span id="ikc-color-hex-{{ block.id }}" class="ikc-color-hex">#1a1a1a</span>
-              </div>
+        <div class="ikc-controls-panel" aria-label="Customizer controls">
+          <div class="ikc-controls-grid">
+            <div class="ikc-group" id="ikc-variant-group-{{ block.id }}">
+              <label class="ikc-label" for="ikc-variant-select-{{ block.id }}">Select variant</label>
+              <select id="ikc-variant-select-{{ block.id }}" class="ikc-select">
+                {%- for variant in product.variants -%}
+                  <option value="{{ variant.id }}" data-title="{{ variant.title | escape }}">
+                    {{ variant.title }}
+                  </option>
+                {%- endfor -%}
+              </select>
             </div>
 
             {%- if show_fonts -%}
             <div class="ikc-group">
-              <label class="ikc-label" for="ikc-font-select-{{ block.id }}">Font style</label>
+              <label class="ikc-label" for="ikc-font-select-{{ block.id }}">Font</label>
               <select id="ikc-font-select-{{ block.id }}" class="ikc-select">
                 <option value="">Loading fonts…</option>
               </select>
             </div>
             {%- endif -%}
 
+            <div class="ikc-group ikc-group--span2">
+              <label class="ikc-label" for="ikc-text-input-{{ block.id }}">Add text</label>
+              <input
+                id="ikc-text-input-{{ block.id }}"
+                class="ikc-input"
+                type="text"
+                placeholder="{{ placeholder | escape }}"
+                maxlength="80"
+              />
+            </div>
+
             {%- if show_upload -%}
-            <div class="ikc-group">
-              <label class="ikc-label">Upload image</label>
+            <div class="ikc-group ikc-group--span2">
+              <label class="ikc-label">Add image</label>
               <label class="ikc-upload-btn" for="ikc-img-input-{{ block.id }}">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                 <span id="ikc-upload-label-{{ block.id }}">Choose image (PNG / JPG)</span>
@@ -107,15 +119,21 @@
               <input id="ikc-img-input-{{ block.id }}" type="file" accept="image/png,image/jpeg,image/webp" style="display:none" />
             </div>
             {%- endif -%}
+          </div>
+        </div>
 
-            <p class="ikc-note">Preview updates live. Design is printed in high resolution.</p>
+        <p id="ikc-modal-error-{{ block.id }}" class="ikc-error-msg" style="display:none"></p>
+
+        <div class="ikc-canvas-shell" aria-label="Design canvas">
+          <div class="ikc-canvas-frame">
+            <canvas id="ikc-canvas-{{ block.id }}"></canvas>
           </div>
         </div>
       </div>
 
       <div class="ikc-modal-footer">
-        <button id="ikc-save-btn-{{ block.id }}" class="ikc-save-btn" type="button">Save Design</button>
-        <button id="ikc-cancel-btn-{{ block.id }}" class="ikc-cancel-btn" type="button">Cancel</button>
+        <button id="ikc-add-to-cart-btn-{{ block.id }}" class="ikc-save-btn" type="button">Add to cart</button>
+        <button id="ikc-cancel-btn-{{ block.id }}" class="ikc-cancel-btn" type="button">Close</button>
       </div>
     </div>
   </div>

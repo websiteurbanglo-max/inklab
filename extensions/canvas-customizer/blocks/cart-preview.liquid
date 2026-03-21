@@ -1,0 +1,172 @@
+{%- comment -%}
+  InkCanvas Cart Preview — App embed block.
+  Loads on every page, but only activates on /cart to show
+  design previews for customized line items.
+{%- endcomment -%}
+
+<script>
+(function () {
+  'use strict';
+
+  if (window.location.pathname !== '/cart') return;
+
+  // Wait for DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', injectCartPreviews);
+  } else {
+    injectCartPreviews();
+  }
+
+  function injectCartPreviews() {
+    fetch('/cart.js')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (cart) {
+        if (!cart || !cart.items || !cart.items.length) return;
+
+        var customItems = cart.items.filter(function (item) {
+          return item.properties && item.properties['_design_image_url'];
+        });
+
+        if (!customItems.length) return;
+
+        // Inject CSS for preview thumbnails (once)
+        if (!document.getElementById('ikc-cart-preview-style')) {
+          var style = document.createElement('style');
+          style.id = 'ikc-cart-preview-style';
+          style.textContent = [
+            '.ikc-cart-preview { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px 12px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 10px; }',
+            '.ikc-cart-preview img { width: 64px; height: 64px; object-fit: contain; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; flex-shrink: 0; }',
+            '.ikc-cart-preview-info { font-size: 0.8125rem; color: #374151; line-height: 1.4; }',
+            '.ikc-cart-preview-label { font-weight: 600; font-size: 0.75rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.03em; }',
+          ].join('\n');
+          document.head.appendChild(style);
+        }
+
+        customItems.forEach(function (item) {
+          var designUrl = item.properties['_design_image_url'];
+          if (!designUrl) return;
+
+          var lineEl = findCartLineElement(item);
+          if (!lineEl) return;
+
+          // Don't inject twice
+          if (lineEl.querySelector('.ikc-cart-preview')) return;
+
+          var preview = document.createElement('div');
+          preview.className = 'ikc-cart-preview';
+
+          var img = document.createElement('img');
+          img.src = designUrl;
+          img.alt = 'Your custom design';
+          img.loading = 'lazy';
+
+          var info = document.createElement('div');
+          info.className = 'ikc-cart-preview-info';
+
+          var label = document.createElement('div');
+          label.className = 'ikc-cart-preview-label';
+          label.textContent = 'Custom Design';
+          info.appendChild(label);
+
+          if (item.properties['_custom_text']) {
+            var textLine = document.createElement('div');
+            textLine.textContent = '\u201C' + item.properties['_custom_text'] + '\u201D';
+            info.appendChild(textLine);
+          }
+
+          if (item.properties['_custom_font']) {
+            var fontLine = document.createElement('div');
+            fontLine.textContent = 'Font: ' + item.properties['_custom_font'];
+            fontLine.style.color = '#9ca3af';
+            fontLine.style.fontSize = '0.75rem';
+            info.appendChild(fontLine);
+          }
+
+          preview.appendChild(img);
+          preview.appendChild(info);
+
+          var insertTarget = findInsertTarget(lineEl);
+          if (insertTarget) {
+            insertTarget.parentNode.insertBefore(preview, insertTarget.nextSibling);
+          } else {
+            lineEl.appendChild(preview);
+          }
+        });
+      })
+      .catch(function (err) {
+        console.warn('[InkCanvas] Cart preview injection failed:', err);
+      });
+  }
+
+  function findCartLineElement(item) {
+    if (item.key) {
+      var byKey = document.querySelector(
+        '[data-line-item-key="' + item.key + '"], ' +
+        '[data-cart-item-key="' + item.key + '"], ' +
+        '[data-key="' + item.key + '"]'
+      );
+      if (byKey) return byKey;
+    }
+
+    if (item.variant_id) {
+      var byVariant = document.querySelector(
+        '[data-variant-id="' + item.variant_id + '"]'
+      );
+      if (byVariant) return byVariant;
+    }
+
+    if (item.url) {
+      var productPath = item.url.split('?')[0];
+      var links = document.querySelectorAll('form[action*="/cart"] a[href*="' + productPath + '"]');
+      for (var i = 0; i < links.length; i++) {
+        var el = links[i];
+        while (el && el.tagName !== 'FORM') {
+          if (el.tagName === 'TR' || el.tagName === 'LI' ||
+              (el.tagName === 'DIV' && el.classList.length > 0)) {
+            var parent = el.parentElement;
+            if (parent && parent.querySelectorAll(':scope > ' + el.tagName).length > 0) {
+              return el;
+            }
+          }
+          el = el.parentElement;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  function findInsertTarget(lineEl) {
+    var selectors = [
+      '.cart-item__details',
+      '.cart__item-details',
+      '.cart-item__info',
+      '.cart__meta',
+      '.product-info',
+      '.cart-item-details',
+      'td:nth-child(2)',
+      '.cart__product-information',
+    ];
+
+    for (var i = 0; i < selectors.length; i++) {
+      var el = lineEl.querySelector(selectors[i]);
+      if (el) return el;
+    }
+
+    var children = lineEl.children;
+    for (var j = 0; j < children.length; j++) {
+      if (children[j].querySelector('a')) return children[j];
+    }
+
+    return null;
+  }
+})();
+</script>
+
+{% schema %}
+{
+  "name": "InkCanvas Cart Preview",
+  "target": "body",
+  "settings": []
+}
+{% endschema %}
