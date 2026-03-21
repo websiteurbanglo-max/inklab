@@ -23,8 +23,8 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
-  // Cast needed: @shopify/shopify-app-session-storage-prisma uses @shopify/shopify-api@12 types,
-  // but @shopify/shopify-app-react-router expects @13 types. Runtime is compatible.
+  // Version mismatch: session-storage-prisma uses @shopify/shopify-api@12, react-router uses @13
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sessionStorage: new PrismaSessionStorage(prisma) as any,
   distribution: AppDistribution.AppStore,
   future: {
