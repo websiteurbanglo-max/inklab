@@ -147,6 +147,7 @@
       blockId:    blockId,
       appUrl:     'https://inklab-production.up.railway.app',
       proxyBase:  '/apps/inkcanvas',
+      fabricUrl:  {{ "fabric.min.js" | asset_url | json }},
       shop:       {{ shop.myshopify_domain | json }},
       productId:  '{{ product.id }}',
       canvasSize: {{ canvas_size }},
@@ -157,7 +158,6 @@
   })();
 </script>
 
-<script src="{{ 'fabric.min.js' | asset_url }}" defer></script>
 <script src="{{ 'canvas-customizer.js' | asset_url }}" defer></script>
 
 {%- endif -%}

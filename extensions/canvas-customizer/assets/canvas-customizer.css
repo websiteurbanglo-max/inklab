@@ -214,6 +214,18 @@
   overflow: hidden;
 }
 
+.ikc-canvas-frame.is-loading::after {
+  content: "Loading preview...";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ikc-color-muted, #6b7280);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 .ikc-canvas-frame .canvas-container {
   border: 0 !important;
   box-shadow: none !important;

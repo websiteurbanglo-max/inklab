@@ -79,6 +79,68 @@
   }
 
   // ── Per-block init ────────────────────────────────────────────────────────
+  function loadFabric(src) {
+    if (window.fabric) return Promise.resolve(window.fabric);
+    if (!src) return Promise.reject(new Error('Fabric URL missing'));
+    if (window.InkCanvasFabricPromise) return window.InkCanvasFabricPromise;
+
+    window.InkCanvasFabricPromise = new Promise(function (resolve, reject) {
+      function rejectFabricLoad(err, scriptEl) {
+        if (scriptEl && scriptEl.parentNode) {
+          scriptEl.parentNode.removeChild(scriptEl);
+        }
+        window.InkCanvasFabricPromise = null;
+        reject(err);
+      }
+
+      var existing = document.querySelector('script[data-inkcanvas-fabric="true"]');
+      if (existing) {
+        if (window.fabric) {
+          resolve(window.fabric);
+          return;
+        }
+        if (existing.dataset.inkcanvasLoaded === 'true' || existing.readyState === 'complete') {
+          if (existing.parentNode) {
+            existing.parentNode.removeChild(existing);
+          }
+          window.InkCanvasFabricPromise = null;
+        } else {
+          existing.addEventListener('load', function () {
+            existing.dataset.inkcanvasLoaded = 'true';
+            if (window.fabric) {
+              resolve(window.fabric);
+            } else {
+              rejectFabricLoad(new Error('Fabric did not initialize'), existing);
+            }
+          });
+          existing.addEventListener('error', function () {
+            rejectFabricLoad(new Error('Fabric failed to load'), existing);
+          });
+          return;
+        }
+      }
+
+      var script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.dataset.inkcanvasFabric = 'true';
+      script.onload = function () {
+        script.dataset.inkcanvasLoaded = 'true';
+        if (window.fabric) {
+          resolve(window.fabric);
+        } else {
+          rejectFabricLoad(new Error('Fabric did not initialize'), script);
+        }
+      };
+      script.onerror = function () {
+        rejectFabricLoad(new Error('Fabric failed to load'), script);
+      };
+      document.head.appendChild(script);
+    });
+
+    return window.InkCanvasFabricPromise;
+  }
+
   function initBlock(cfg) {
     var blockId    = cfg.blockId;
     var root       = document.getElementById('inkcanvas-root-' + blockId);
@@ -86,6 +148,7 @@
 
     var APP_URL    = (cfg.appUrl  || '').replace(/\/$/, '');
     var PROXY_BASE = (cfg.proxyBase || '/apps/inkcanvas').replace(/\/$/, '');
+    var FABRIC_URL = cfg.fabricUrl || '';
     var SHOP       = cfg.shop || (window.Shopify && window.Shopify.shop) || '';
     var PRODUCT_ID = cfg.productId || '';
     var CANVAS_SZ  = parseInt(cfg.canvasSize, 10) || 500;
@@ -225,33 +288,41 @@
       if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
     });
 
+    function warmFabric() {
+      if (!FABRIC_URL || window.fabric) return;
+      loadFabric(FABRIC_URL).catch(function (err) {
+        if (debugEnabled) console.debug('[InkCanvas] Fabric warm load failed:', err);
+      });
+    }
+
+    openBtn.addEventListener('pointerenter', warmFabric, { once: true });
+    openBtn.addEventListener('touchstart', warmFabric, { once: true, passive: true });
+    openBtn.addEventListener('focus', warmFabric, { once: true });
+
     function openModal() {
       modal.classList.add('is-open');
       modal.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
 
       if (!state.fc) {
-        if (window.fabric) {
-          // Defer Fabric init until after layout/paint so frame measurements
-          // aren't temporarily near-zero.
-          requestAnimationFrame(function () {
-            requestAnimationFrame(function () { initCanvas(); });
-          });
-        } else {
-          var attempts = 0;
-          var poll = setInterval(function () {
-            attempts++;
-            if (window.fabric) {
-              clearInterval(poll);
+        setCanvasLoading(true);
+        var fabricTiming = markStart('fabric');
+        loadFabric(FABRIC_URL)
+          .then(function () {
+            markEnd('fabric', fabricTiming, 'loaded');
+            requestAnimationFrame(function () {
               requestAnimationFrame(function () {
-                requestAnimationFrame(function () { initCanvas(); });
+                setCanvasLoading(false);
+                if (!modal.classList.contains('is-open')) return;
+                initCanvas();
               });
-            } else if (attempts > 50) {
-              clearInterval(poll);
-              showError('Canvas engine failed to load. Please refresh.');
-            }
-          }, 100);
-        }
+            });
+          })
+          .catch(function () {
+            setCanvasLoading(false);
+            markEnd('fabric', fabricTiming, 'failed');
+            showError('Canvas engine failed to load. Please refresh.');
+          });
       } else {
         // Ensure canvas fits after reopen/orientation changes
         scheduleResize();
@@ -407,6 +478,13 @@
     }
     function clearError() {
       if (errorMsg) { errorMsg.textContent = ''; errorMsg.style.display = 'none'; }
+    }
+
+    function setCanvasLoading(isLoading) {
+      var frame = canvasFrame || document.querySelector('#ikc-modal-' + blockId + ' .ikc-canvas-frame');
+      if (!frame) return;
+      frame.classList.toggle('is-loading', Boolean(isLoading));
+      frame.setAttribute('aria-busy', isLoading ? 'true' : 'false');
     }
 
     // ── Font manager ──────────────────────────────────────────────────────
