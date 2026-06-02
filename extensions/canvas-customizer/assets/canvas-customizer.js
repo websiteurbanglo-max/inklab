@@ -6,6 +6,41 @@
 (function () {
   'use strict';
 
+  function isDebugEnabled() {
+    if (/(?:^|[?&])inkcanvas_debug=1(?:&|$)/.test(window.location.search)) {
+      return true;
+    }
+    try {
+      return window.localStorage && window.localStorage.getItem('inkcanvas_debug') === '1';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  var debugEnabled = isDebugEnabled();
+
+  function markStart(name) {
+    if (!debugEnabled || !window.performance) return null;
+    var mark = 'ikc:' + name + ':start:' + Math.random().toString(36).slice(2);
+    performance.mark(mark);
+    return mark;
+  }
+
+  function markEnd(name, startMark, detail) {
+    if (!debugEnabled || !window.performance || !startMark) return;
+    var endMark = startMark.replace(':start:', ':end:');
+    performance.mark(endMark);
+    try {
+      var measureName = 'ikc:' + name;
+      performance.measure(measureName, startMark, endMark);
+      var entries = performance.getEntriesByName(measureName);
+      var last = entries[entries.length - 1];
+      console.debug('[InkCanvas timing]', name, Math.round(last.duration) + 'ms', detail || '');
+    } catch (_) {
+      console.debug('[InkCanvas timing]', name, detail || '');
+    }
+  }
+
   // ── Boot: wait for DOM, then init each block ──────────────────────────────
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', bootAll);
@@ -101,17 +136,31 @@
     // ── Fetch per-product config from App Proxy ──────────────────────────
     var configUrl = PROXY_BASE + '/config?shop=' + encodeURIComponent(SHOP) + '&product_id=' + encodeURIComponent(PRODUCT_ID);
 
-    fetch(configUrl)
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (remoteConfig) {
-        if (remoteConfig) {
-          if (remoteConfig.canvasSize) CANVAS_SZ = parseInt(remoteConfig.canvasSize, 10) || CANVAS_SZ;
-          state.remoteFonts = remoteConfig.fonts || null;
-        }
-      })
-      .catch(function () {
-        // Config fetch failure is non-fatal — use defaults
-      });
+    var configPromise = loadRemoteConfig(configUrl, state);
+
+    function loadRemoteConfig(url, state) {
+      var timing = markStart('config');
+      return fetch(url)
+        .then(function (r) {
+          if (!r.ok) throw new Error('Config error: ' + r.status);
+          return r.json();
+        })
+        .then(function (remoteConfig) {
+          if (remoteConfig) {
+            if (remoteConfig.canvasSize) CANVAS_SZ = parseInt(remoteConfig.canvasSize, 10) || CANVAS_SZ;
+            state.remoteFonts = Array.isArray(remoteConfig.fonts) ? remoteConfig.fonts : null;
+            markEnd('config', timing, 'proxy');
+            return remoteConfig;
+          }
+          markEnd('config', timing, 'empty');
+          return null;
+        })
+        .catch(function (err) {
+          markEnd('config', timing, 'failed');
+          if (debugEnabled) console.debug('[InkCanvas] Config fetch failed:', err);
+          return null;
+        });
+    }
 
     // ── Variant sync setup ────────────────────────────────────────────────
     var pageVariantInput = findPageVariantInput();
@@ -254,7 +303,7 @@
       fc.add(state.hintObj);
       fc.renderAll();
 
-      if (SHOW_FONTS)  setupFonts(fc, state, blockId, APP_URL, SHOP);
+      if (SHOW_FONTS)  setupFonts(fc, state, blockId, APP_URL, SHOP, configPromise);
       setupText(fc, state, blockId);
       if (SHOW_UPLOAD) setupImageUpload(fc, state, blockId);
 
@@ -361,22 +410,38 @@
     }
 
     // ── Font manager ──────────────────────────────────────────────────────
-    function setupFonts(fc, state, blockId, APP_URL, SHOP) {
+    function setupFonts(fc, state, blockId, APP_URL, SHOP, configPromise) {
       var select = document.getElementById('ikc-font-select-' + blockId);
       if (!select) return;
 
-      var fontsPromise;
-      if (state.remoteFonts && state.remoteFonts.length > 0) {
-        fontsPromise = Promise.resolve(state.remoteFonts);
-      } else {
-        fontsPromise = fetch(APP_URL + '/api/fonts?shop=' + encodeURIComponent(SHOP))
-          .then(function (r) { return r.json(); });
-      }
+      select.innerHTML = '<option value="">Default font</option>';
+
+      var fontsTiming = markStart('fonts');
+      var fontsPromise = withTimeout(configPromise, 1200)
+        .then(function (configResult) {
+          if (Array.isArray(state.remoteFonts)) {
+            return { source: 'proxy', fonts: state.remoteFonts };
+          }
+          if (configResult.timedOut && debugEnabled) {
+            console.debug('[InkCanvas] Config fetch timed out before fonts fallback');
+          }
+
+          return fetch(APP_URL + '/api/fonts?shop=' + encodeURIComponent(SHOP))
+            .then(function (r) {
+              if (!r.ok) throw new Error('Fonts error: ' + r.status);
+              return r.json();
+            })
+            .then(function (fonts) {
+              return { source: 'direct-fallback', fonts: fonts };
+            });
+        });
 
       fontsPromise
-        .then(function (fonts) {
+        .then(function (result) {
+          var fonts = result.fonts;
+          markEnd('fonts', fontsTiming, result.source);
           if (!Array.isArray(fonts) || fonts.length === 0) {
-            select.innerHTML = '<option value="">No fonts configured</option>';
+            select.innerHTML = '<option value="">Default font</option>';
             return;
           }
           select.innerHTML = fonts.map(function (f) {
@@ -391,9 +456,34 @@
             if (opt && opt.value) loadAndApplyFont(fc, state, opt.value, opt.dataset.name || opt.text);
           });
         })
-        .catch(function () {
+        .catch(function (err) {
+          markEnd('fonts', fontsTiming, 'failed');
+          if (debugEnabled) console.debug('[InkCanvas] Fonts load failed:', err);
           select.innerHTML = '<option value="">Default font</option>';
         });
+
+      function withTimeout(promise, ms) {
+        return new Promise(function (resolve) {
+          var settled = false;
+          var timer = setTimeout(function () {
+            if (settled) return;
+            settled = true;
+            resolve({ timedOut: true });
+          }, ms);
+
+          promise.then(function (value) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve({ timedOut: false, value: value });
+          }).catch(function () {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            resolve({ timedOut: false, value: null });
+          });
+        });
+      }
     }
 
     function loadAndApplyFont(fc, state, url, name) {
