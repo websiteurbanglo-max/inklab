@@ -291,12 +291,60 @@
       if (e.target === modal) closeModal();
     });
 
-    // Close on Escape key + trap focus inside the open modal
+    // Close on Escape, Delete selected canvas object, trap focus inside modal
     document.addEventListener('keydown', function (e) {
       if (!modal.classList.contains('is-open')) return;
-      if (e.key === 'Escape') closeModal();
+      if (e.key === 'Escape') { closeModal(); return; }
       trapModalFocus(e);
+
+      if ((e.key === 'Delete' || e.key === 'Backspace') && state.fc) {
+        var active = document.activeElement;
+        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+        var activeObj = state.fc.getActiveObject();
+        if (!activeObj) return;
+        e.preventDefault();
+        if (activeObj === state.imageObj) {
+          removeImage();
+        } else if (activeObj === state.textObj) {
+          state.fc.remove(state.textObj);
+          state.textObj = null;
+          var textInput = document.getElementById('ikc-text-input-' + blockId);
+          if (textInput) textInput.value = '';
+          restoreHintIfEmpty();
+          state.fc.renderAll();
+        }
+      }
     });
+
+    function restoreHintIfEmpty() {
+      if (!state.fc || state.textObj || state.imageObj || state.hintObj) return;
+      var sz = state.canvasSz;
+      state.hintObj = new fabric.Text('Add text or image to preview', {
+        left: sz / 2, top: sz / 2,
+        originX: 'center', originY: 'center',
+        fontSize: Math.max(13, Math.round(sz * 0.033)),
+        fontFamily: 'sans-serif', fill: '#c4c9d4',
+        selectable: false, evented: false,
+      });
+      state.fc.add(state.hintObj);
+    }
+
+    function removeImage() {
+      if (state.imageObj && state.fc) {
+        state.fc.remove(state.imageObj);
+        state.imageObj = null;
+      }
+      if (state.blobUrl) { URL.revokeObjectURL(state.blobUrl); state.blobUrl = ''; }
+      state.rawFile = null;
+      var imgInput    = document.getElementById('ikc-img-input-' + blockId);
+      var labelSpan   = document.getElementById('ikc-upload-label-' + blockId);
+      var removeBtn   = document.getElementById('ikc-remove-img-btn-' + blockId);
+      if (imgInput)  imgInput.value = '';
+      if (labelSpan) labelSpan.textContent = 'Choose image (PNG / JPG)';
+      if (removeBtn) removeBtn.style.display = 'none';
+      if (state.fc) { restoreHintIfEmpty(); state.fc.renderAll(); }
+      clearError();
+    }
 
     function warmFabric() {
       if (!FABRIC_URL || window.fabric) return;
@@ -698,6 +746,7 @@
     function setupImageUpload(fc, state, blockId) {
       var input     = document.getElementById('ikc-img-input-' + blockId);
       var labelSpan = document.getElementById('ikc-upload-label-' + blockId);
+      var removeBtn = document.getElementById('ikc-remove-img-btn-' + blockId);
       if (!input) return;
 
       input.addEventListener('change', function () {
@@ -709,7 +758,12 @@
         state.rawFile = file;
         state.blobUrl = URL.createObjectURL(file);
         placeImageOnCanvas(fc, state, state.blobUrl, file.name, labelSpan);
+        if (removeBtn) removeBtn.style.display = '';
       });
+
+      if (removeBtn) {
+        removeBtn.addEventListener('click', function () { removeImage(); });
+      }
     }
 
     function placeImageOnCanvas(fc, state, url, fileName, labelSpan) {

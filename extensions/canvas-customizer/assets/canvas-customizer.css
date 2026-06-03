@@ -4,16 +4,15 @@
 
 /* ── Root container ── */
 .inkcanvas-root {
-  --ikc-font-family: inherit;
-  --ikc-color-text: rgb(var(--color-foreground, 17, 24, 39));
-  --ikc-color-muted: rgba(var(--color-foreground, 17, 24, 39), 0.68);
-  --ikc-color-surface: rgb(var(--color-background, 255, 255, 255));
-  --ikc-color-surface-subdued: rgba(var(--color-foreground, 17, 24, 39), 0.035);
-  --ikc-color-border: rgba(var(--color-foreground, 17, 24, 39), 0.12);
-  --ikc-color-primary: rgb(var(--color-foreground, 17, 24, 39));
-  --ikc-color-primary-hover: rgba(var(--color-foreground, 17, 24, 39), 0.88);
+  --ikc-color-text: #111827;
+  --ikc-color-muted: #6b7280;
+  --ikc-color-surface: #ffffff;
+  --ikc-color-surface-subdued: #f9fafb;
+  --ikc-color-border: rgba(17, 24, 39, 0.12);
+  --ikc-color-primary: #1a1a1a;
+  --ikc-color-primary-hover: #333333;
   --ikc-color-danger: #b42318;
-  --ikc-focus-ring: rgba(var(--color-foreground, 17, 24, 39), 0.16);
+  --ikc-focus-ring: rgba(17, 24, 39, 0.16);
   --ikc-radius-control: 10px;
   --ikc-radius-panel: 14px;
   --ikc-radius-modal: 16px;
@@ -22,7 +21,7 @@
   --ikc-motion-duration: 160ms;
   --ikc-motion-ease: cubic-bezier(0.2, 0, 0, 1);
 
-  font-family: var(--ikc-font-family);
+  font-family: inherit;
   color: var(--ikc-color-text);
   margin: 16px 0;
   box-sizing: border-box;
@@ -382,6 +381,29 @@
   border-color: rgba(17, 24, 39, 0.36);
   background: rgba(17, 24, 39, 0.03);
   color: #111827;
+}
+
+.ikc-remove-img-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--ikc-color-danger);
+  border: 1px solid var(--ikc-color-danger);
+  border-radius: var(--ikc-radius-control);
+  font-size: 0.8125rem;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--ikc-motion-duration);
+  width: 100%;
+  justify-content: center;
+}
+
+.ikc-remove-img-btn:hover {
+  background: rgba(180, 35, 24, 0.06);
 }
 
 .ikc-color-row {
