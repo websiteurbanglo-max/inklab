@@ -766,6 +766,35 @@
       }
     }
 
+    function addDeleteControl(obj) {
+      obj.controls = Object.assign({}, obj.controls, {
+        deleteControl: new fabric.Control({
+          x: 0.5,
+          y: -0.5,
+          cursorStyle: 'pointer',
+          mouseUpHandler: function () { removeImage(); return true; },
+          render: function (ctx, left, top) {
+            ctx.save();
+            ctx.translate(left, top);
+            ctx.beginPath();
+            ctx.arc(0, 0, 11, 0, 2 * Math.PI);
+            ctx.fillStyle = '#ef4444';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(-4.5, -4.5); ctx.lineTo(4.5, 4.5);
+            ctx.moveTo(4.5, -4.5);  ctx.lineTo(-4.5, 4.5);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            ctx.restore();
+          },
+          sizeX: 22,
+          sizeY: 22,
+        }),
+      });
+    }
+
     function placeImageOnCanvas(fc, state, url, fileName, labelSpan) {
       var sz = state.canvasSz;
       fabric.Image.fromURL(url, { crossOrigin: 'anonymous' })
@@ -775,6 +804,7 @@
           var maxDim = sz * 0.85;
           var scale  = Math.min(maxDim / (img.width || 1), maxDim / (img.height || 1));
           img.set({ left: sz / 2, top: sz / 2, originX: 'center', originY: 'center', scaleX: scale, scaleY: scale });
+          addDeleteControl(img);
           state.imageObj = img;
           fc.add(img);
           if (state.textObj) fc.bringObjectToFront(state.textObj);

@@ -2,8 +2,12 @@
    InkCanvas Canvas Customizer – Storefront widget styles
    ============================================================ */
 
-/* ── Root container ── */
-.inkcanvas-root {
+/* ── CSS custom properties ──
+   Defined on both .inkcanvas-root AND .ikc-modal-overlay because the JS
+   moves the modal to document.body, taking it out of .inkcanvas-root's
+   descendant scope. Without this, all var(--ikc-*) resolve to empty. ── */
+.inkcanvas-root,
+.ikc-modal-overlay {
   --ikc-color-text: #111827;
   --ikc-color-muted: #6b7280;
   --ikc-color-surface: #ffffff;
@@ -20,7 +24,10 @@
   --ikc-shadow-canvas: 0 10px 28px rgba(0, 0, 0, 0.10);
   --ikc-motion-duration: 160ms;
   --ikc-motion-ease: cubic-bezier(0.2, 0, 0, 1);
+}
 
+/* ── Root container ── */
+.inkcanvas-root {
   font-family: inherit;
   color: var(--ikc-color-text);
   margin: 16px 0;
@@ -115,8 +122,8 @@
 
 /* ── Modal popup ── */
 .ikc-modal {
-  background: var(--ikc-color-surface);
-  border: 1px solid var(--ikc-color-border);
+  background: #ffffff !important;
+  border: 1px solid rgba(17, 24, 39, 0.12);
   border-radius: var(--ikc-radius-modal);
   box-shadow: var(--ikc-shadow-modal);
   width: 100%;
@@ -221,8 +228,8 @@
   min-width: 0;
   min-height: 0;
   border-radius: var(--ikc-radius-panel);
-  border: 1px solid var(--ikc-color-border);
-  background: var(--ikc-color-surface);
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: #ffffff !important;
   box-shadow: var(--ikc-shadow-canvas);
   display: flex;
   align-items: center;
@@ -267,9 +274,9 @@
 
 .ikc-save-btn {
   padding: 10px 16px;
-  background: var(--ikc-color-primary);
-  color: var(--ikc-color-surface);
-  border: 1px solid var(--ikc-color-border);
+  background: #1a1a1a !important;
+  color: #ffffff !important;
+  border: none;
   border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
@@ -282,7 +289,7 @@
   width: 100%;
 }
 
-.ikc-save-btn:hover { background: var(--ikc-color-primary-hover); }
+.ikc-save-btn:hover { background: #333333 !important; }
 .ikc-save-btn:active { transform: scale(0.96); }
 .ikc-save-btn:disabled {
   opacity: 0.62;
@@ -292,9 +299,9 @@
 
 .ikc-cancel-btn {
   padding: 10px 14px;
-  background: var(--ikc-color-surface);
-  color: var(--ikc-color-text);
-  border: 1px solid var(--ikc-color-border);
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid rgba(17, 24, 39, 0.18) !important;
   border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
@@ -304,7 +311,7 @@
   flex-shrink: 0;
 }
 
-.ikc-cancel-btn:hover { background: rgba(17, 24, 39, 0.04); border-color: rgba(17, 24, 39, 0.18); }
+.ikc-cancel-btn:hover { background: rgba(17, 24, 39, 0.04) !important; border-color: rgba(17, 24, 39, 0.28) !important; }
 
 /* ── Shared form controls ── */
 .ikc-group {
