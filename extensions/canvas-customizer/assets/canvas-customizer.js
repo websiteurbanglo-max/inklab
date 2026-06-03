@@ -194,6 +194,7 @@
       selectedVariantTitle: '',
       canvasSz:   CANVAS_SZ,
       remoteFonts: null,
+      previouslyFocused: null,
     };
 
     // ── Fetch per-product config from App Proxy ──────────────────────────
@@ -283,9 +284,11 @@
       if (e.target === modal) closeModal();
     });
 
-    // Close on Escape key
+    // Close on Escape key + trap focus inside the open modal
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && modal.classList.contains('is-open')) closeModal();
+      if (!modal.classList.contains('is-open')) return;
+      if (e.key === 'Escape') closeModal();
+      trapModalFocus(e);
     });
 
     function warmFabric() {
@@ -300,9 +303,11 @@
     openBtn.addEventListener('focus', warmFabric, { once: true });
 
     function openModal() {
+      state.previouslyFocused = document.activeElement;
       modal.classList.add('is-open');
       modal.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
+      setTimeout(focusFirstModalControl, 0);
 
       if (!state.fc) {
         setCanvasLoading(true);
@@ -333,6 +338,47 @@
       modal.classList.remove('is-open');
       modal.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
+      restoreFocusAfterClose();
+    }
+
+    function getFocusableModalElements() {
+      return Array.prototype.slice.call(modal.querySelectorAll(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+      )).filter(function (el) {
+        return !el.disabled && el.offsetParent !== null;
+      });
+    }
+
+    function focusFirstModalControl() {
+      var focusable = getFocusableModalElements();
+      var first = focusable[0];
+      if (first && typeof first.focus === 'function') {
+        first.focus({ preventScroll: true });
+      }
+    }
+
+    function trapModalFocus(e) {
+      if (e.key !== 'Tab' || !modal.classList.contains('is-open')) return;
+      var focusable = getFocusableModalElements();
+      if (focusable.length === 0) return;
+      var first = focusable[0];
+      var last = focusable[focusable.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+
+    function restoreFocusAfterClose() {
+      var target = state.previouslyFocused || openBtn;
+      if (target && typeof target.focus === 'function') {
+        target.focus({ preventScroll: true });
+      }
+      state.previouslyFocused = null;
     }
 
     // ── Canvas init ───────────────────────────────────────────────────────
