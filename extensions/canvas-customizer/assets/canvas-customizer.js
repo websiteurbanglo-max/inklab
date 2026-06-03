@@ -141,6 +141,13 @@
     return window.InkCanvasFabricPromise;
   }
 
+  function getShopifyRoot() {
+    if (window.Shopify && window.Shopify.routes && window.Shopify.routes.root) {
+      return window.Shopify.routes.root;
+    }
+    return '/';
+  }
+
   function initBlock(cfg) {
     var blockId    = cfg.blockId;
     var root       = document.getElementById('inkcanvas-root-' + blockId);
@@ -445,21 +452,24 @@
       clearError();
 
       if (state.fc) {
+        var exportTiming = markStart('design-export');
         state.savedDataUrl = state.fc.toDataURL({ format: 'png', multiplier: 3 });
+        markEnd('design-export', exportTiming);
       }
 
-      var origLabel = addToCartBtn.textContent;
-      addToCartBtn.disabled = true;
-      addToCartBtn.textContent = 'Processing…';
+      var origLabel = setPrimaryButtonBusy(addToCartBtn, 'Processing...');
 
       // Upload design + raw image, then add to cart via Ajax API
       var dataUrl = state.savedDataUrl;
+      var cartTiming = null;
 
+      var designTiming = markStart('design-upload');
       var designUpload = fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=design', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ dataUrl: dataUrl }),
       }).then(function (r) {
+        markEnd('design-upload', designTiming, String(r.status));
         if (!r.ok) throw new Error('Design upload error: ' + r.status);
         return r.json();
       });
@@ -468,9 +478,11 @@
         ? (function () {
             var fd = new FormData();
             fd.append('file', state.rawFile);
+            var rawTiming = markStart('raw-upload');
             return fetch(APP_URL + '/api/upload?shop=' + encodeURIComponent(SHOP) + '&type=raw', {
               method: 'POST', body: fd,
             }).then(function (r) {
+              markEnd('raw-upload', rawTiming, String(r.status));
               if (!r.ok) throw new Error('Raw upload error: ' + r.status);
               return r.json();
             });
@@ -493,7 +505,8 @@
           };
 
           // Use Shopify Ajax Cart API for full control over post-add behavior
-          return fetch('/cart/add.js', {
+          cartTiming = markStart('cart-add');
+          return fetch(getShopifyRoot() + 'cart/add.js', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -504,6 +517,7 @@
           });
         })
         .then(function (r) {
+          markEnd('cart-add', cartTiming, String(r.status));
           if (!r.ok) throw new Error('Cart add error: ' + r.status);
           return r.json();
         })
@@ -513,8 +527,7 @@
         })
         .catch(function (err) {
           console.error('[InkCanvas] Add to cart failed:', err);
-          addToCartBtn.disabled = false;
-          addToCartBtn.textContent = origLabel || 'Add to cart';
+          restorePrimaryButton(addToCartBtn, origLabel, 'Add to cart');
           showError('Failed to add to cart. Please try again.');
         });
     }
@@ -524,6 +537,22 @@
     }
     function clearError() {
       if (errorMsg) { errorMsg.textContent = ''; errorMsg.style.display = 'none'; }
+    }
+
+    function setPrimaryButtonBusy(button, label) {
+      if (!button) return '';
+      var previous = button.textContent;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = label;
+      return previous;
+    }
+
+    function restorePrimaryButton(button, previousLabel, fallbackLabel) {
+      if (!button) return;
+      button.disabled = false;
+      button.removeAttribute('aria-busy');
+      button.textContent = previousLabel || fallbackLabel;
     }
 
     function setCanvasLoading(isLoading) {
