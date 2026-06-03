@@ -4,7 +4,26 @@
 
 /* ── Root container ── */
 .inkcanvas-root {
-  font-family: inherit;
+  --ikc-font-family: inherit;
+  --ikc-color-text: rgb(var(--color-foreground, 17, 24, 39));
+  --ikc-color-muted: rgba(var(--color-foreground, 17, 24, 39), 0.68);
+  --ikc-color-surface: rgb(var(--color-background, 255, 255, 255));
+  --ikc-color-surface-subdued: rgba(var(--color-foreground, 17, 24, 39), 0.035);
+  --ikc-color-border: rgba(var(--color-foreground, 17, 24, 39), 0.12);
+  --ikc-color-primary: rgb(var(--color-foreground, 17, 24, 39));
+  --ikc-color-primary-hover: rgba(var(--color-foreground, 17, 24, 39), 0.88);
+  --ikc-color-danger: #b42318;
+  --ikc-focus-ring: rgba(var(--color-foreground, 17, 24, 39), 0.16);
+  --ikc-radius-control: 10px;
+  --ikc-radius-panel: 14px;
+  --ikc-radius-modal: 16px;
+  --ikc-shadow-modal: 0 24px 60px rgba(0, 0, 0, 0.22);
+  --ikc-shadow-canvas: 0 10px 28px rgba(0, 0, 0, 0.10);
+  --ikc-motion-duration: 160ms;
+  --ikc-motion-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  font-family: var(--ikc-font-family);
+  color: var(--ikc-color-text);
   margin: 16px 0;
   box-sizing: border-box;
 }
@@ -15,25 +34,24 @@
   align-items: center;
   gap: 8px;
   padding: 11px 22px;
-  background: #1a1a1a;
-  color: #fff;
+  background: var(--ikc-color-primary);
+  color: var(--ikc-color-surface);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s, transform 0.1s;
+  transition-property: background, transform, box-shadow;
+  transition-duration: var(--ikc-motion-duration);
+  transition-timing-function: var(--ikc-motion-ease);
+  min-height: 44px;
   user-select: none;
 }
 
 .ikc-trigger-btn:hover {
-  background: #333;
+  background: var(--ikc-color-primary-hover);
   transform: translateY(-1px);
-}
-
-.ikc-trigger-btn:active {
-  transform: translateY(0);
 }
 
 /* ── Preview area (shown after Save) ── */
@@ -98,10 +116,10 @@
 
 /* ── Modal popup ── */
 .ikc-modal {
-  background: #ffffff;
-  border: 1px solid rgba(17, 24, 39, 0.08);
-  border-radius: 14px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
+  background: var(--ikc-color-surface);
+  border: 1px solid var(--ikc-color-border);
+  border-radius: var(--ikc-radius-modal);
+  box-shadow: var(--ikc-shadow-modal);
   width: 100%;
   max-width: 860px;
   max-height: min(90vh, 760px);
@@ -131,8 +149,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #111827;
-  letter-spacing: -0.01em;
+  color: var(--ikc-color-text);
 }
 
 .ikc-close-btn {
@@ -141,10 +158,10 @@
   justify-content: center;
   padding: 8px;
   background: transparent;
-  border: 1px solid rgba(17, 24, 39, 0.10);
+  border: 1px solid var(--ikc-color-border);
   cursor: pointer;
-  color: #6b7280;
-  border-radius: 10px;
+  color: var(--ikc-color-muted);
+  border-radius: var(--ikc-radius-control);
   transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
@@ -168,9 +185,9 @@
 
 /* ── Controls panel (Shadcn-like) ── */
 .ikc-controls-panel {
-  border: 1px solid rgba(17, 24, 39, 0.08);
-  border-radius: 14px;
-  background: rgba(249, 250, 251, 0.65);
+  border: 1px solid var(--ikc-color-border);
+  border-radius: var(--ikc-radius-panel);
+  background: var(--ikc-color-surface-subdued);
   padding: 12px;
   flex: 0 0 360px;
   max-width: 360px;
@@ -204,10 +221,10 @@
   position: relative; /* Helps Fabric wrapper anchor correctly */
   min-width: 0;
   min-height: 0;
-  border-radius: 16px;
-  border: 1px solid rgba(17, 24, 39, 0.10);
-  background: #ffffff;
-  box-shadow: 0 10px 28px rgba(0,0,0,0.10);
+  border-radius: var(--ikc-radius-panel);
+  border: 1px solid var(--ikc-color-border);
+  background: var(--ikc-color-surface);
+  box-shadow: var(--ikc-shadow-canvas);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -251,28 +268,35 @@
 
 .ikc-save-btn {
   padding: 10px 16px;
-  background: #111827;
-  color: #ffffff;
-  border: 1px solid rgba(17, 24, 39, 0.10);
-  border-radius: 12px;
+  background: var(--ikc-color-primary);
+  color: var(--ikc-color-surface);
+  border: 1px solid var(--ikc-color-border);
+  border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.08s, background 0.15s, border-color 0.15s;
+  transition-property: background, transform, box-shadow;
+  transition-duration: var(--ikc-motion-duration);
+  transition-timing-function: var(--ikc-motion-ease);
+  min-height: 44px;
   width: 100%;
 }
 
-.ikc-save-btn:hover { background: #0b1220; }
-.ikc-save-btn:active { transform: translateY(1px); }
-.ikc-save-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+.ikc-save-btn:hover { background: var(--ikc-color-primary-hover); }
+.ikc-save-btn:active { transform: scale(0.96); }
+.ikc-save-btn:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  transform: none;
+}
 
 .ikc-cancel-btn {
   padding: 10px 14px;
-  background: #ffffff;
-  color: #374151;
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  border-radius: 12px;
+  background: var(--ikc-color-surface);
+  color: var(--ikc-color-text);
+  border: 1px solid var(--ikc-color-border);
+  border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
   font-weight: 500;
@@ -300,8 +324,8 @@
 .ikc-input {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  border-radius: 12px;
+  border: 1px solid var(--ikc-color-border);
+  border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
   color: inherit;
@@ -319,8 +343,8 @@
 .ikc-select {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid rgba(17, 24, 39, 0.12);
-  border-radius: 12px;
+  border: 1px solid var(--ikc-color-border);
+  border-radius: var(--ikc-radius-control);
   font-size: 0.9375rem;
   font-family: inherit;
   color: inherit;
@@ -342,8 +366,8 @@
   align-items: center;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px dashed rgba(17, 24, 39, 0.22);
-  border-radius: 12px;
+  border: 1px dashed var(--ikc-color-border);
+  border-radius: var(--ikc-radius-control);
   font-size: 0.875rem;
   font-family: inherit;
   color: #374151;
@@ -404,8 +428,43 @@
 .ikc-note {
   margin: 0;
   font-size: 0.8125rem;
-  color: #9ca3af;
+  color: var(--ikc-color-muted);
   line-height: 1.5;
+}
+
+/* ── Consistent focus + active states ── */
+.ikc-trigger-btn:focus-visible,
+.ikc-save-btn:focus-visible,
+.ikc-cancel-btn:focus-visible,
+.ikc-edit-btn:focus-visible,
+.ikc-close-btn:focus-visible,
+.ikc-input:focus-visible,
+.ikc-select:focus-visible,
+.ikc-upload-btn:focus-visible {
+  outline: 2px solid var(--ikc-focus-ring);
+  outline-offset: 2px;
+}
+
+.ikc-cancel-btn:active,
+.ikc-edit-btn:active,
+.ikc-close-btn:active {
+  transform: scale(0.96);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .ikc-modal,
+  .ikc-trigger-btn,
+  .ikc-save-btn,
+  .ikc-cancel-btn,
+  .ikc-edit-btn,
+  .ikc-close-btn,
+  .ikc-input,
+  .ikc-select,
+  .ikc-upload-btn {
+    animation: none;
+    transition-duration: 1ms;
+  }
 }
 
 /* ── Responsive ── */
